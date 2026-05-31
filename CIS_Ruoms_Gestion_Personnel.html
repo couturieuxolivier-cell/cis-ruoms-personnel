@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CIS Ruoms — Gestion du Personnel</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,sans-serif;background:#f5f5f0;color:#1a1a1a;font-size:14px}
+  header{background:#cc3300;color:#fff;padding:14px 24px;display:flex;align-items:center;gap:12px}
+  header h1{font-size:18px;font-weight:600}
+  header span{background:rgba(255,255,255,.2);font-size:11px;padding:2px 8px;border-radius:4px}
+  .container{max-width:1200px;margin:0 auto;padding:20px}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+  .stat{background:#fff;border-radius:8px;padding:14px 16px;border:1px solid #e5e5e0}
+  .stat-lbl{font-size:11px;color:#888;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em}
+  .stat-val{font-size:26px;font-weight:700}
+  .stat-val.red{color:#cc3300}.stat-val.orange{color:#e07000}.stat-val.blue{color:#1a5fa8}
+  .toolbar{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+  .toolbar input,.toolbar select{padding:7px 10px;border:1px solid #ccc;border-radius:6px;font-size:13px;background:#fff}
+  .toolbar input{width:220px}
+  .btn{padding:7px 14px;border:1px solid #ccc;border-radius:6px;font-size:13px;background:#fff;cursor:pointer}
+  .btn:hover{background:#f0f0f0}
+  .btn-primary{background:#cc3300;color:#fff;border-color:#cc3300}
+  .btn-primary:hover{background:#b02a00}
+  .tabs{display:flex;gap:0;border-bottom:2px solid #e5e5e0;margin-bottom:16px}
+  .tab{padding:9px 18px;font-size:13px;cursor:pointer;border:none;background:none;color:#666;border-bottom:3px solid transparent;margin-bottom:-2px;font-weight:500}
+  .tab.active{color:#cc3300;border-bottom-color:#cc3300}
+  .tab:hover:not(.active){color:#333}
+  .panel{display:none}.panel.active{display:block}
+  table{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e5e5e0}
+  thead{background:#f9f9f7}
+  th{font-size:11px;font-weight:600;color:#666;text-align:left;padding:10px 12px;border-bottom:1px solid #e5e5e0;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+  td{padding:9px 12px;border-bottom:1px solid #f0f0ea;vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  tr:last-child td{border-bottom:none}
+  tbody tr:hover{background:#fdf8f6;cursor:pointer}
+  .pill{display:inline-block;font-size:11px;font-weight:600;padding:2px 7px;border-radius:4px}
+  .p-grade{background:#ede9ff;color:#4a3aaa}
+  .p-spv{background:#deeeff;color:#1a5fa8}
+  .p-spp{background:#e0f5e8;color:#1a7a3a}
+  .p-pats{background:#fff0dd;color:#8a5500}
+  .p-t1{background:#d4f5e8;color:#0a5a35}
+  .p-t2{background:#ede9ff;color:#3a2a9a}
+  .p-t3{background:#fff0dd;color:#7a4500}
+  .p-t4{background:#ffe8e5;color:#8a2020}
+  .p-nc{background:#eeeeea;color:#777}
+  .p-ok{background:#e0f5e8;color:#1a7a3a}
+  .p-warn{background:#fff0dd;color:#8a5500}
+  .p-danger{background:#ffe8e5;color:#8a2020}
+  .red{color:#cc3300}.orange{color:#e07000}.green{color:#1a7a3a}.muted{color:#aaa}
+  .team-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .team-card{background:#fff;border:1px solid #e5e5e0;border-radius:8px;overflow:hidden}
+  .team-hdr{padding:10px 14px;font-size:13px;font-weight:700}
+  .th1{background:#d4f5e8;color:#0a5a35}.th2{background:#ede9ff;color:#3a2a9a}
+  .th3{background:#fff0dd;color:#7a4500}.th4{background:#ffe8e5;color:#8a2020}
+  .thnc{background:#f0f0ec;color:#666}
+  .tm{padding:8px 14px;font-size:12px;border-top:1px solid #f0f0ea;cursor:pointer}
+  .tm:hover{background:#fdf8f6}
+  .tm-grade{font-size:11px;color:#999;margin-top:1px}
+  .alert-row{display:flex;align-items:center;gap:12px;padding:10px 14px;background:#fff;border-radius:8px;margin-bottom:8px;cursor:pointer;border:1px solid #e5e5e0}
+  .alert-row:hover{background:#fdf8f6}
+  .avatar{width:36px;height:36px;border-radius:50%;background:#deeeff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#1a5fa8;flex-shrink:0}
+  .alert-name{font-weight:600;flex:1;font-size:13px}
+  .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;align-items:flex-start;justify-content:center;padding-top:40px;overflow-y:auto}
+  .overlay.open{display:flex}
+  .drawer{background:#fff;border-radius:10px;width:560px;max-height:85vh;overflow-y:auto;padding:1.5rem;margin-bottom:40px}
+  .drawer-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.2rem}
+  .drawer-hdr h2{font-size:16px;font-weight:700}
+  .x-btn{background:none;border:none;cursor:pointer;font-size:22px;color:#999;line-height:1}
+  .x-btn:hover{color:#333}
+  .identity{display:flex;gap:14px;align-items:center;padding-bottom:1.2rem;border-bottom:1px solid #f0f0ea;margin-bottom:1rem}
+  .big-avatar{width:50px;height:50px;border-radius:50%;background:#deeeff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#1a5fa8;flex-shrink:0}
+  .sec-lbl{font-size:11px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.06em;margin:1rem 0 8px}
+  .ig{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px}
+  .ir-lbl{font-size:11px;color:#888;margin-bottom:2px}
+  .ir-val{font-size:13px;font-weight:600}
+  .fc{background:#f9f9f7;border-radius:7px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;border:1px solid #eee}
+  .fc-name{font-size:13px;font-weight:600}.fc-date{font-size:11px;color:#888;margin-top:2px}
+  .edit-form label{font-size:11px;color:#888;display:block;margin-bottom:3px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+  .edit-form input,.edit-form select{width:100%;padding:7px 9px;border:1px solid #ccc;border-radius:5px;font-size:13px}
+  .edit-form .ig{gap:12px 16px}
+  .btn-row{display:flex;gap:8px;margin-top:1.2rem}
+  .no-results{text-align:center;padding:40px;color:#aaa;font-size:14px}
+  .toast{position:fixed;bottom:24px;right:24px;background:#1a7a3a;color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;opacity:0;transition:opacity .4s;z-index:999;pointer-events:none}
+  .sync-status{font-size:11px;padding:3px 10px;border-radius:5px;background:rgba(255,255,255,.2);color:#fff;font-weight:500}
+</style>
+</head>
+<body>
+
+<header>
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2c0 6-8 8-8 14a8 8 0 0 0 16 0C20 10 12 8 12 2z"/></svg>
+  <h1>CIS Ruoms — Gestion du Personnel</h1>
+  <span>SDIS 07</span>
+  <span class="sync-status" id="syncStatus">⟳ Chargement...</span>
+</header>
+
+<div class="container">
+  <div class="stats">
+    <div class="stat"><div class="stat-lbl">Effectif total</div><div class="stat-val blue" id="st-total">—</div></div>
+    <div class="stat"><div class="stat-lbl">SPV</div><div class="stat-val blue" id="st-spv">—</div></div>
+    <div class="stat"><div class="stat-lbl">Alertes formation</div><div class="stat-val red" id="st-alerte">—</div></div>
+    <div class="stat"><div class="stat-lbl">VM à renouveler</div><div class="stat-val orange" id="st-med">—</div></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('liste')">👥 Liste agents</button>
+    <button class="tab" onclick="showTab('equipes')">🔴 Équipes de garde</button>
+    <button class="tab" onclick="showTab('formations')">📋 Formations &amp; alertes</button>
+  </div>
+
+  <div id="panel-liste" class="panel active">
+    <div class="toolbar">
+      <input type="text" id="srch" placeholder="🔍 Rechercher un agent…" oninput="applyFilters()">
+      <select id="feq" onchange="applyFilters()">
+        <option value="">Toutes les équipes</option>
+        <option value="1">Équipe 1</option>
+        <option value="2">Équipe 2</option>
+        <option value="3">Équipe 3</option>
+        <option value="4">Équipe 4</option>
+        <option value="0">Non affecté</option>
+      </select>
+      <select id="fst" onchange="applyFilters()">
+        <option value="">Tous les statuts</option>
+        <option value="SPV">SPV</option>
+        <option value="SPP">SPP</option>
+        <option value="PATS">PATS</option>
+      </select>
+      <button class="btn btn-primary" onclick="openNew()">+ Ajouter un agent</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th style="width:120px">Nom</th>
+          <th style="width:100px">Prénom</th>
+          <th style="width:65px">Grade</th>
+          <th style="width:70px">Statut</th>
+          <th style="width:80px">Équipe</th>
+          <th>Fonctions</th>
+          <th style="width:90px">SAP</th>
+          <th style="width:90px">Visite méd.</th>
+          <th style="width:80px">Aptitude</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+
+  <div id="panel-equipes" class="panel">
+    <div class="team-grid" id="tgrid"></div>
+  </div>
+
+  <div id="panel-formations" class="panel">
+    <p style="color:#888;margin-bottom:14px;font-size:13px">Agents avec recyclage SAP/INC ou visite médicale manquants, dépassés ou à planifier.</p>
+    <div id="alist"></div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay" onclick="maybeClose(event)">
+  <div class="drawer" id="drawer" onclick="event.stopPropagation()"></div>
+</div>
+
+<script>
+const TODAY = new Date(2026, 4, 31);
+
+function parseMyDate(s) {
+  if (!s || !s.trim()) return null;
+  const p = s.trim().split('/');
+  if (p.length === 3) return new Date(+p[2], +p[1] - 1, +p[0]);
+  return null;
+}
+function fmt(d) {
+  if (!d) return '—';
+  return d.toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit', year:'numeric'});
+}
+function monthsAgo(d) {
+  if (!d) return 999;
+  return (TODAY - d) / (1000 * 60 * 60 * 24 * 30.44);
+}
+function inits(a) {
+  return ((a.nom || '?')[0] + ((a.prenom || '?')[0])).toUpperCase();
+}
+
+// Affectation équipes depuis Equipe_de_Garde_2.xlsx
+const TEAMS = {
+  1: ['COUTURIEUX','HARAULT','DE CASTRO','DOS SANTOS','THEODORE G','MARAUL','GILLES','CLERC','DARCY'],
+  2: ['CARCI','TOURRE','HANOCK','CASTEL','LATEUR','SONRIER','DEGARDIN','HAON','DELATTRE'],
+  3: ['TOULOUZE J','ACHARD','PROVEDEL','DELGEHIER','DELACROIX','THEODORE A','MONTERO','VALLAT','HAUTREUX'],
+  4: ['STOLDVISER','GILLET']
+};
+
+function getTeam(a) {
+  const n = a.nom.toUpperCase();
+  const np = (a.nom + ' ' + (a.prenom || '')[0]).toUpperCase();
+  for (const [t, members] of Object.entries(TEAMS)) {
+    for (const m of members) {
+      if (m === np || m === n) return +t;
+    }
+  }
+  return 0;
+}
+
+function setTeam(nom, prenom, t) {
+  const n = nom.toUpperCase();
+  const np = (nom + ' ' + (prenom||'')[0]).toUpperCase();
+  for (let i = 1; i <= 4; i++) {
+    TEAMS[i] = TEAMS[i].filter(x => x !== n && x !== np);
+  }
+  if (t > 0) TEAMS[t].push(n);
+}
+
+// Données complètes issues des fichiers uploadés (fiches individuelles + feuille PERSONNEL)
+var DATA = [
+  {nom:'ACHARD',      prenom:'Nathalie',  grade:'SCH', statut:'SPV',  naissance:'',           fonctions:'',                         qualifs:'',                            sap:null,              inc:null, med:null,              aptitude:'',       tel:'',              email:'',                            adresse:'',                                          mat:'',        contact:'',                  ctTel:'',              permB:true,  permC:false, permCE:false, bip:'',       taille:'', entree_cis:'', notes:''},
+  {nom:'ADAMOLI',     prenom:'Yoan',      grade:'ADJ', statut:'SPV',  naissance:'',           fonctions:'',                         qualifs:'',                            sap:null,              inc:null, med:null,              aptitude:'',       tel:'',              email:'',                            adresse:'',                                          mat:'',        contact:'',                  ctTel:'',              permB:true,  permC:false, permCE:false, bip:'',       taille:'', entree_cis:'', notes:''},
+  {nom:'BOYER',       prenom:'Vanessa',   grade:'IPR', statut:'PATS', naissance:'',           fonctions:'',                         qualifs:'',                            sap:null,              inc:null, med:null,              aptitude:'',       tel:'',              email:'',                            adresse:'',                                          mat:'',        contact:'',                  ctTel:'',              permB:true,  permC:false, permCE:false, bip:'',       taille:'', entree_cis:'', notes:''},
+  {nom:'CARCI',       prenom:'Bruno',     grade:'ADC', statut:'SPV',  naissance:'',           fonctions:'',                         qualifs:'',                            sap:null,              inc:null, med:null,              aptitude:'',       tel:'',              email:'',                            adresse:'',                                          mat:'',        contact:'',                  ctTel:'',              permB:true,  permC:false, permCE:false, bip:'',       taille:'', entree_cis:'', notes:'Démission fonction'},
+  {nom:'CASTEL',      prenom:'Kevin',     grade:'1CL', statut:'SPV',  naissance:'',           fonctions:'',                         qualifs:'',                            sap:null,              inc:null, med:null,              aptitude:'',       tel:'',              email:'',                            adresse:'',                                          mat:'',        contact:'',                  ctTel:'',              permB:true,  permC:false, permCE:false, bip:'',       taille:'', entree_cis:'', notes:'Suspension engagement'},
+  {nom:'CLERC',       prenom:'Eloise',    grade:'1CL', statut:'SPV',  naissance:'13/12/2000', fonctions:'',                         qualifs:'',                            sap:null,              inc:null, med:null,              aptitude:'',       tel:'06-35-49-72-93',email:'elise.clerc@sdis07.fr',      adresse:'469 chemin des Laurent 07120 GROSPIERRE', mat:'',        contact:'',                  ctTel:'',              permB:true,  permC:false, permCE:false, bip:'',       taille:'', entree_cis:'01/12/2024', notes:''},
+  {nom:'COUTURIEUX',  prenom:'Olivier',   grade:'Ltn', statut:'SPV',  naissance:'28/10/1975', fonctions:'Chef de Centre',           qualifs:'SAL-SAV-SEV-USAR 2-RCH 1',   sap:new Date(2025,11,9),inc:null, med:null,              aptitude:'Complet',tel:'07-87-72-83-19',email:'olivier.couturieux@sdis07.fr', adresse:"683 Chemin du FEZ 07150 Vallon Pont d'Arc", mat:'9081', contact:'COUTURIEUX-BAGGI Jennifer', ctTel:'07-82-27-04-48', permB:true, permC:true, permCE:true, bip:'0078711', taille:'104', entree_cis:'', notes:'Permis : Fluvial, côtier, autoroutier, moto'},
+  {nom:'DARCY',       prenom:'Carl',      grade:'1CL', statut:'SPV',  naissance:'',           fonctions:'',                         qualifs:'',                            sap:null,              inc:null, med:null,              aptitude:'',       tel:'',              email:'',                            adresse:'',                                          mat:'',        contact:'',                  ctTel:'',              permB:true,  permC:false, permCE:false, bip:'',       taille:'', entree_cis:'', notes:''},
+  {nom:'DE CASTRO',   prenom:'Romain',    grade:'SCH', statut:'SPV',  naissance:'',           fonctions:'Sport / Réf bateau',       qualifs:'',                            sap:null,              inc:null, med:null,              aptitude:'',       tel:'',              email:'',                            adresse:'',                                          mat:'',        contact:'',                  ctTel:'',              permB:true,  permC:false, permCE:false, bip:'',       taille:'', entree_cis:'', notes:''},
+  {nom:'DEGARDIN',    prenom:'Julian',    grade:'1CL', statut:'SPV',  naissance:'',           fonctions:'',                         qualifs:'',                            sap:null,              inc:null, med:null,              aptitude:'',       tel:'',              email:'',                            adresse:'',                                          mat:'',        contact:'',                  ctTel:'',              permB:true,  permC:false, permCE:false, bip:'',       taille:'', entree_cis:'', notes:''},
+  {nom:'DELACROIX',   prenom:'Lucas',     grade:'CCH', statut:'SPV',  naissance:'',           fonctions:'',                         qualifs:'',                            sap:null,              inc:null, med:null,              aptitude:'',       tel:'',              email:'',                            adresse:'',                                          mat:'',        contact:'',                  ctTel:'',              permB:true,  permC:false, permCE:false, bip:'',       taille:'', entree_cis:'', notes:''},
+  {nom:'DELATTRE',    prenom:'William',   grade:'1CL', statut:'SPV',  naissance:'',           fonctions:'',                         qualifs:'',                            sap:null,              inc:null, med:null,              aptitude:'',       tel:'',              email:'',                            adresse:'',                                          mat:'',        contact:'',                  ctTel:'',              permB:true,  permC:false, permCE:false, bip:'',       taille:'', entree_cis:'', notes:''},
+  {nom:'DELGEHIER',   prenom:'Johann',    grade:'1CL', statut:'SPV',  naissance:'',           fonctions:'',                         qualifs:'',                            sap:null,              inc:null, med:null,              aptitude:'',       tel:'',              email:'',                            adresse:'',                                          mat:'',        contact:'',                  ctTel:'',              permB:true,  permC:false, permCE:false, bip:'',       taille:'', entree_cis:'', notes:''},
+  {nom:'DOS SANTOS',  prenom:'Sylvain',   grade:'1CL', statut:'SPV',  naissance:'',           fonctions:'',                         qualifs:'',                            sap:null,              inc:null, med:null,              aptitude:'',       tel:'',              email:'',                            adresse:'',                                          mat:'',        contact:'',                  ctTel:'',              permB:true,  permC:false, permCE:false, bip:'',       taille:'', entree_cis:'', notes:''},
+  {nom:'GILLES',      prenom:'Paul',      grade:'SAP', statut:'SPV',  naissance:'',           fonctions:'',                         qualifs:'',                            sap:null,              inc:null, med:null,              aptitude:'',       tel:'',              email:'',                            adresse:'',                                          mat:'',        contact:'',                  ctTel:'',              permB:true,  permC:false, permCE:false, bip:'',       taille:'', entree_cis:'', notes:''},
+  {nom:'HANOCK',      prenom:'Thomas',    grade:'SGT', statut:'SPV',  naissance:'',           fonctions:'Petits matériels',         qualifs:'',                            sap:null,              inc:null, med:null,              aptitude:'',       tel:'',              email:'',                            adresse:'',                                          mat:'',        contact:'',                  ctTel:'',              permB:true,  permC:false, permCE:false, bip:'',       taille:'', entree_cis:'', notes:''},
+  {nom:'HAON',        prenom:'Laurine',   grade:'1CL', statut:'SPV',  naissance:'',           fonctions:'Gardes astreintes',        qualifs:'',                            sap:null,              inc:null, med:null,              aptitude:'',       tel:'',              email:'',                            adresse:'',                                          mat:'',        contact:'',                  ctTel:'',              permB:true,  permC:false, permCE:false, bip:'',       taille:'', entree_cis:'', notes:''},
+  {nom:'HARAULT',     prenom:'Olivier',   grade:'SCH', statut:'SPV',  naissance:'',           fonctions:'',                         qualifs:'',                            sap:null,              inc:null, med:null,              aptitude:'',       tel:'',              email:'',                            adresse:'',                                          mat:'',        contact:'',                  ctTel:'',              permB:true,  permC:false, permCE:false, bip:'',       taille:'', entree_cis:'', notes:''},
+  {nom:'HAUTREUX',    prenom:'Camille',   grade:'1CL', statut:'SPV',  naissance:'23/02/2004', fonctions:'Pharmacie',                qualifs:'EQ SUAP',                     sap:null,              inc:null, med:null,              aptitude:'',       tel:'06-32-54-64-49',email:'camille.hautreux@sdis07.fr', adresse:'10 rue des Herbousses 07120 St Alban',    mat:'9737',    contact:'Coline BRUSQ',      ctTel:'06-48-23-00-27', permB:true,  permC:false, permCE:false, bip:'',       taille:'', entree_cis:'', notes:'Conjointe'},
+  {nom:'JURY',        prenom:'Patrick',   grade:'ADC', statut:'SPV',  naissance:'',           fonctions:'',                         qualifs:'',                            sap:null,              inc:null, med:null,              aptitude:'',       tel:'',              email:'',                            adresse:'',                                          mat:'',        contact:'',                  ctTel:'',              permB:true,  permC:false, permCE:false, bip:'',       taille:'', entree_cis:'', notes:''},
+  {nom:'LATEUR',      prenom:'Nicolas',   grade:'CPL', statut:'SPV',  naissance:'',           fonctions:'',                         qualifs:'',                            sap:null,              inc:null, med:null,              aptitude:'',       tel:'',              email:'',                            adresse:'',                                          mat:'',        contact:'',                  ctTel:'',              permB:true,  permC:false, permCE:false, bip:'',       taille:'', entree_cis:'', notes:''},
+  {nom:'MARAUL',      prenom:'Amandine',  grade:'1CL', statut:'SPV',  naissance:'',           fonctions:'',                         qualifs:'',                            sap:null,              inc:null, med:null,              aptitude:'',       tel:'',              email:'',                            adresse:'',                                          mat:'',        contact:'',                  ctTel:'',              permB:true,  permC:false, permCE:false, bip:'',       taille:'', entree_cis:'', notes:''},
+  {nom:'MARQUET',     prenom:'Dylan',     grade:'CPL', statut:'SPV',  naissance:'07/01/2004', fonctions:'Service des gardes',       qualifs:'FOR JSP',                     sap:null,              inc:null, med:new Date(2025,8,1), aptitude:'APTE',   tel:'06-43-30-90-27',email:'dylan.marquet@sdis95.fr',    adresse:"58 rue de l'Abbaye Du VAL 95630 MERIEL",  mat:'34246',   contact:'Mme MAGNIER Nadège',ctTel:'06-88-40-03-98', permB:true,  permC:false, permCE:false, bip:'',       taille:'', entree_cis:'', notes:''},
+  {nom:'MONTERO',     prenom:'Tom',       grade:'1CL', statut:'SPV',  naissance:'',           fonctions:'',                         qualifs:'',                            sap:null,              inc:null, med:null,              aptitude:'',       tel:'',              email:'',                            adresse:'',                                          mat:'',        contact:'',                  ctTel:'',              permB:true,  permC:false, permCE:false, bip:'',       taille:'', entree_cis:'', notes:''},
+  {nom:'MOREL',       prenom:'Ludovic',   grade:'ADC', statut:'SPV',  naissance:'',           fonctions:'',                         qualifs:'',                            sap:null,              inc:null, med:null,              aptitude:'',       tel:'',              email:'',                            adresse:'',                                          mat:'',        contact:'',                  ctTel:'',              permB:true,  permC:false, permCE:false, bip:'',       taille:'', entree_cis:'', notes:''},
+  {nom:'NIVERT',      prenom:'Florian',   grade:'SCH', statut:'SPV',  naissance:'21/07/1986', fonctions:'FDF2 CA VSR CA VSAV COD2 EAP ACC PRO F SUAP', qualifs:'SERVICE INFRA', sap:null,          inc:null, med:new Date(2026,0,23),aptitude:'APTE',   tel:'06-77-82-26-26',email:'f.nivert@sdis30.fr',          adresse:'815 Chemin de Gréjan 30430 ROCHEGUDE',    mat:'',        contact:'NIVERT Coralie',    ctTel:'06-21-90-82-74', permB:true,  permC:true,  permCE:false, bip:'',       taille:'', entree_cis:'', notes:'Epouse'},
+  {nom:'PROVEDEL',    prenom:'Anthony',   grade:'SGT', statut:'SPV',  naissance:'29/10/1997', fonctions:'Mécanique',                qualifs:'FDF2-CA VSAV-EQ SR (à faire)',sap:null,              inc:null, med:null,              aptitude:'',       tel:'06-75-83-77-40',email:'anthony.provedel@sdis07.fr',  adresse:"15 rue Jeanne d'Arc 07120 RUOMS",         mat:'8015',    contact:'Mickael PROVEDEL',  ctTel:'07-76-92-12-29', permB:true,  permC:true,  permCE:false, bip:'',       taille:'', entree_cis:'01/01/2026', notes:'Frère'},
+  {nom:'QUARD',       prenom:'Jimmy',     grade:'SCH', statut:'SPV',  naissance:'',           fonctions:'',                         qualifs:'',                            sap:null,              inc:null, med:null,              aptitude:'',       tel:'',              email:'',                            adresse:'',                                          mat:'',        contact:'',                  ctTel:'',              permB:true,  permC:false, permCE:false, bip:'',       taille:'', entree_cis:'', notes:''},
+  {nom:'REGOURDA',    prenom:'William',   grade:'ADC', statut:'SPV',  naissance:'',           fonctions:'',                         qualifs:'',                            sap:null,              inc:null, med:null,              aptitude:'',       tel:'',              email:'',                            adresse:'',                                          mat:'',        contact:'',                  ctTel:'',              permB:true,  permC:false, permCE:false, bip:'',       taille:'', entree_cis:'', notes:''},
+  {nom:'SONRIER',     prenom:'Kevin',     grade:'SGT', statut:'SPV',  naissance:'18/06/1995', fonctions:'',                         qualifs:'CE-CO VSAV',                  sap:null,              inc:null, med:null,              aptitude:'',       tel:'07-73-86-26-01',email:'kevin.sonrier@sdis07.fr',     adresse:"11 Chemin de l'Espede 07120 RUOMS",       mat:'',        contact:'Pauline THOMAS',    ctTel:'06-83-57-73-29', permB:true,  permC:false, permCE:false, bip:'',       taille:'', entree_cis:'05/01/2026', notes:'Conjointe'},
+  {nom:'STOLDVISER',  prenom:'Etienne',   grade:'SAP', statut:'SPV',  naissance:'',           fonctions:'',                         qualifs:'',                            sap:null,              inc:null, med:null,              aptitude:'',       tel:'',              email:'',                            adresse:'',                                          mat:'',        contact:'',                  ctTel:'',              permB:true,  permC:false, permCE:false, bip:'',       taille:'', entree_cis:'', notes:''},
+  {nom:'THEODORE',    prenom:'Frédéric',  grade:'Ltn', statut:'SPV',  naissance:'',           fonctions:'Adjoint chef de centre',   qualifs:'',                            sap:null,              inc:null, med:null,              aptitude:'',       tel:'',              email:'',                            adresse:'',                                          mat:'',        contact:'',                  ctTel:'',              permB:true,  permC:false, permCE:false, bip:'',       taille:'', entree_cis:'', notes:''},
+  {nom:'THEODORE',    prenom:'Ghislain',  grade:'CPL', statut:'SPV',  naissance:'',           fonctions:'',                         qualifs:'',                            sap:null,              inc:null, med:null,              aptitude:'',       tel:'',              email:'',                            adresse:'',                                          mat:'',        contact:'',                  ctTel:'',              permB:true,  permC:false, permCE:false, bip:'',       taille:'', entree_cis:'', notes:''},
+  {nom:'THEODORE',    prenom:'Yohann',    grade:'ADC', statut:'SPV',  naissance:'',           fonctions:'',                         qualifs:'',                            sap:null,              inc:null, med:null,              aptitude:'',       tel:'',              email:'',                            adresse:'',                                          mat:'',        contact:'',                  ctTel:'',              permB:true,  permC:false, permCE:false, bip:'',       taille:'', entree_cis:'', notes:''},
+  {nom:'THEODORE',    prenom:'Anthonny',  grade:'CCH', statut:'SPV',  naissance:'',           fonctions:'Gardes astreintes',        qualifs:'',                            sap:null,              inc:null, med:null,              aptitude:'',       tel:'',              email:'',                            adresse:'',                                          mat:'',        contact:'',                  ctTel:'',              permB:true,  permC:false, permCE:false, bip:'',       taille:'', entree_cis:'', notes:''},
+  {nom:'TOULOUZE',    prenom:'Julien',    grade:'ADC', statut:'SPV',  naissance:'20/02/1985', fonctions:'Service Pharmacie',        qualifs:'CATE (RT possible)',          sap:null,              inc:null, med:null,              aptitude:'',       tel:'06-04-65-25-12',email:'julien.toulouze@sdis07.fr',   adresse:'655 Chemin du Courbier 07120 St Alban Auriolles', mat:'B201103', contact:'Stéphanie TOULOUZE', ctTel:'06-03-75-42-99', permB:true, permC:false, permCE:false, bip:'', taille:'', entree_cis:'', notes:'Epouse'},
+  {nom:'TOULOUZE',    prenom:'Stéphanie', grade:'IPR', statut:'SPP',  naissance:'',           fonctions:'ISP / SSSM',               qualifs:'',                            sap:null,              inc:null, med:null,              aptitude:'',       tel:'',              email:'',                            adresse:'',                                          mat:'',        contact:'',                  ctTel:'',              permB:true,  permC:false, permCE:false, bip:'',       taille:'', entree_cis:'', notes:''},
+  {nom:'TOURRE',      prenom:'Axel',      grade:'SGT', statut:'SPV',  naissance:'',           fonctions:'',                         qualifs:'',                            sap:null,              inc:null, med:null,              aptitude:'',       tel:'',              email:'',                            adresse:'',                                          mat:'',        contact:'',                  ctTel:'',              permB:true,  permC:false, permCE:false, bip:'',       taille:'', entree_cis:'', notes:''},
+  {nom:'VALLAT',      prenom:'Paul',      grade:'1CL', statut:'SPV',  naissance:'',           fonctions:'',                         qualifs:'',                            sap:null,              inc:null, med:null,              aptitude:'',       tel:'',              email:'',                            adresse:'',                                          mat:'',        contact:'',                  ctTel:'',              permB:true,  permC:false, permCE:false, bip:'',       taille:'', entree_cis:'', notes:''},
+  {nom:'VENALON',     prenom:'Remy',      grade:'CCH', statut:'SPV',  naissance:'',           fonctions:'',                         qualifs:'',                            sap:null,              inc:null, med:null,              aptitude:'',       tel:'',              email:'',                            adresse:'',                                          mat:'',        contact:'',                  ctTel:'',              permB:true,  permC:false, permCE:false, bip:'',       taille:'', entree_cis:'', notes:''},
+];
+
+function tPill(t) {
+  if (!t) return '<span class="pill p-nc">NC</span>';
+  return '<span class="pill p-t' + t + '">Éq.' + t + '</span>';
+}
+function stPill(s) {
+  var c = {SPV:'p-spv',SPP:'p-spp',PATS:'p-pats'}[s] || 'p-nc';
+  return '<span class="pill ' + c + '">' + (s||'—') + '</span>';
+}
+function sapCell(d) {
+  if (!d) return '<span class="muted">—</span>';
+  var m = monthsAgo(d);
+  var cls = m > 24 ? 'red' : m > 18 ? 'orange' : 'green';
+  return '<span class="' + cls + '">' + fmt(d) + '</span>';
+}
+function medCell(d) {
+  if (!d) return '<span class="muted">—</span>';
+  var m = monthsAgo(d);
+  var cls = m > 12 ? 'red' : m > 9 ? 'orange' : 'green';
+  return '<span class="' + cls + '">' + fmt(d) + '</span>';
+}
+function aptCell(a) {
+  if (!a) return '<span class="muted">—</span>';
+  var c = (a.toLowerCase().indexOf('apte') >= 0 || a.toLowerCase().indexOf('complet') >= 0) ? 'p-ok' : 'p-warn';
+  return '<span class="pill ' + c + '">' + a + '</span>';
+}
+
+var view = DATA.slice();
+
+function applyFilters() {
+  var q = (document.getElementById('srch').value || '').toLowerCase();
+  var eq = document.getElementById('feq').value;
+  var st = document.getElementById('fst').value;
+  view = DATA.filter(function(a) {
+    var t = getTeam(a);
+    var mq = !q || (a.nom + ' ' + a.prenom).toLowerCase().indexOf(q) >= 0 || (a.grade||'').toLowerCase().indexOf(q) >= 0 || (a.fonctions||'').toLowerCase().indexOf(q) >= 0;
+    var meq = !eq || (eq === '0' ? t === 0 : t === +eq);
+    var mst = !st || a.statut === st;
+    return mq && meq && mst;
+  });
+  renderTable();
+}
+
+function updateStats() {
+  document.getElementById('st-total').textContent = DATA.length;
+  document.getElementById('st-spv').textContent = DATA.filter(function(a){return a.statut==='SPV';}).length;
+  document.getElementById('st-alerte').textContent = DATA.filter(function(a){return !a.sap || monthsAgo(a.sap)>18 || !a.inc || monthsAgo(a.inc)>18;}).length;
+  document.getElementById('st-med').textContent = DATA.filter(function(a){return !a.med || monthsAgo(a.med)>9;}).length;
+}
+
+function renderTable() {
+  var tb = document.getElementById('tbody');
+  if (!tb) return;
+  if (view.length === 0) {
+    tb.innerHTML = '<tr><td colspan="9" class="no-results">Aucun agent trouvé</td></tr>';
+    return;
+  }
+  var html = '';
+  for (var vi = 0; vi < view.length; vi++) {
+    var a = view[vi];
+    var i = DATA.indexOf(a);
+    var t = getTeam(a);
+    html += '<tr onclick="openAgent(' + i + ')">';
+    html += '<td style="font-weight:600">' + a.nom + '</td>';
+    html += '<td>' + a.prenom + '</td>';
+    html += '<td><span class="pill p-grade">' + a.grade + '</span></td>';
+    html += '<td>' + stPill(a.statut) + '</td>';
+    html += '<td>' + tPill(t) + '</td>';
+    html += '<td style="color:#888">' + (a.fonctions || '—') + '</td>';
+    html += '<td>' + sapCell(a.sap) + '</td>';
+    html += '<td>' + medCell(a.med) + '</td>';
+    html += '<td>' + aptCell(a.aptitude) + '</td>';
+    html += '</tr>';
+  }
+  tb.innerHTML = html;
+}
+
+function renderTeams() {
+  var tg = document.getElementById('tgrid');
+  if (!tg) return;
+  var names = {1:'Équipe 1',2:'Équipe 2',3:'Équipe 3',4:'Équipe 4'};
+  var html = '';
+  for (var t = 1; t <= 4; t++) {
+    var members = DATA.filter(function(a){return getTeam(a)===t;});
+    html += '<div class="team-card"><div class="team-hdr th' + t + '">' + names[t] + ' <span style="font-size:11px;opacity:.7">(' + members.length + ')</span></div>';
+    for (var m = 0; m < members.length; m++) {
+      var idx = DATA.indexOf(members[m]);
+      html += '<div class="tm" onclick="openAgent(' + idx + ')"><div style="font-weight:600">' + members[m].nom + ' ' + members[m].prenom[0] + '.</div><div class="tm-grade">' + members[m].grade + (members[m].fonctions ? ' · ' + members[m].fonctions.split('/')[0].trim() : '') + '</div></div>';
+    }
+    html += '</div>';
+  }
+  var nc = DATA.filter(function(a){return getTeam(a)===0;});
+  if (nc.length) {
+    html += '<div class="team-card"><div class="team-hdr thnc">Non affectés (' + nc.length + ')</div>';
+    for (var m = 0; m < nc.length; m++) {
+      var idx = DATA.indexOf(nc[m]);
+      html += '<div class="tm" onclick="openAgent(' + idx + ')"><div style="font-weight:600">' + nc[m].nom + ' ' + nc[m].prenom[0] + '.</div><div class="tm-grade">' + nc[m].grade + '</div></div>';
+    }
+    html += '</div>';
+  }
+  tg.innerHTML = html;
+}
+
+function renderAlerts() {
+  var al = document.getElementById('alist');
+  if (!al) return;
+  var rows = [];
+  for (var i = 0; i < DATA.length; i++) {
+    var a = DATA[i];
+    var issues = [];
+    if (!a.sap) issues.push({txt:'SAP manquant',cls:'red'});
+    else if (monthsAgo(a.sap) > 24) issues.push({txt:'SAP dépassé (' + fmt(a.sap) + ')',cls:'red'});
+    else if (monthsAgo(a.sap) > 18) issues.push({txt:'SAP à planifier (' + fmt(a.sap) + ')',cls:'orange'});
+    if (!a.inc) issues.push({txt:'INC manquant',cls:'orange'});
+    else if (monthsAgo(a.inc) > 18) issues.push({txt:'INC dépassé',cls:'red'});
+    if (!a.med) issues.push({txt:'Visite méd. manquante',cls:'orange'});
+    else if (monthsAgo(a.med) > 12) issues.push({txt:'VM dépassée (' + fmt(a.med) + ')',cls:'red'});
+    else if (monthsAgo(a.med) > 9) issues.push({txt:'VM bientôt (' + fmt(a.med) + ')',cls:'orange'});
+    if (!a.aptitude) issues.push({txt:'Aptitude non renseignée',cls:'orange'});
+    if (a.notes && (a.notes.toLowerCase().indexOf('suspension') >= 0 || a.notes.toLowerCase().indexOf('demission') >= 0))
+      issues.push({txt:a.notes,cls:'red'});
+    if (issues.length) rows.push({a:a,i:i,issues:issues,prio:issues.some(function(x){return x.cls==='red';})?0:1});
+  }
+  rows.sort(function(a,b){return a.prio-b.prio;});
+  var html = '';
+  for (var r = 0; r < rows.length; r++) {
+    var row = rows[r];
+    var issHtml = row.issues.map(function(x){return '<span class="' + x.cls + '">' + x.txt + '</span>';}).join(' · ');
+    html += '<div class="alert-row" onclick="openAgent(' + row.i + ')">';
+    html += '<div class="avatar">' + inits(row.a) + '</div>';
+    html += '<div class="alert-name">' + row.a.nom + ' ' + row.a.prenom + ' <span class="pill p-grade" style="font-size:10px">' + row.a.grade + '</span></div>';
+    html += '<div style="font-size:12px">' + issHtml + '</div>';
+    html += '</div>';
+  }
+  al.innerHTML = html || '<p style="color:#aaa">Aucune alerte.</p>';
+}
+
+function openAgent(i) {
+  var a = DATA[i];
+  var t = getTeam(a);
+  var html = '';
+  html += '<div class="drawer-hdr"><h2>' + a.nom + ' ' + a.prenom + '</h2><button class="x-btn" onclick="closeOverlay()">×</button></div>';
+  html += '<div class="identity"><div class="big-avatar">' + inits(a) + '</div><div>';
+  html += '<div style="font-size:18px;font-weight:700">' + a.nom + ' ' + a.prenom + '</div>';
+  html += '<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap"><span class="pill p-grade">' + a.grade + '</span>' + stPill(a.statut) + tPill(t) + (a.aptitude ? aptCell(a.aptitude) : '') + '</div>';
+  html += '</div></div>';
+  html += '<div class="sec-lbl">Coordonnées</div>';
+  html += '<div class="ig">';
+  html += '<div><div class="ir-lbl">Date de naissance</div><div class="ir-val">' + (a.naissance||'—') + '</div></div>';
+  html += '<div><div class="ir-lbl">Entrée au CIS</div><div class="ir-val">' + (a.entree_cis||'—') + '</div></div>';
+  html += '<div><div class="ir-lbl">Téléphone</div><div class="ir-val">' + (a.tel||'—') + '</div></div>';
+  html += '<div><div class="ir-lbl">Email</div><div class="ir-val" style="font-size:12px">' + (a.email||'—') + '</div></div>';
+  html += '<div style="grid-column:span 2"><div class="ir-lbl">Adresse</div><div class="ir-val">' + (a.adresse||'—') + '</div></div>';
+  html += '</div>';
+  html += '<div class="sec-lbl">Missions & qualifications</div>';
+  html += '<div class="ig">';
+  html += '<div><div class="ir-lbl">Fonctions</div><div class="ir-val">' + (a.fonctions||'—') + '</div></div>';
+  html += '<div><div class="ir-lbl">Qualifications</div><div class="ir-val">' + (a.qualifs||'—') + '</div></div>';
+  html += '<div><div class="ir-lbl">Matricule</div><div class="ir-val">' + (a.mat||'—') + '</div></div>';
+  html += '<div><div class="ir-lbl">BIP</div><div class="ir-val">' + (a.bip||'—') + '</div></div>';
+  html += '</div>';
+  html += '<div class="sec-lbl">Permis</div>';
+  html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px">';
+  html += '<span class="pill ' + (a.permB?'p-ok':'p-nc') + '">B : ' + (a.permB?'OUI':'NON') + '</span>';
+  html += '<span class="pill ' + (a.permC?'p-ok':'p-nc') + '">C : ' + (a.permC?'OUI':'NON') + '</span>';
+  html += '<span class="pill ' + (a.permCE?'p-ok':'p-nc') + '">CE : ' + (a.permCE?'OUI':'NON') + '</span>';
+  html += '</div>';
+  html += '<div class="sec-lbl">Suivi formation & médical</div>';
+  var sapM = monthsAgo(a.sap);
+  var sapSt = !a.sap ? '<span class="red">⚠ Manquant</span>' : sapM>24 ? '<span class="red">⚠ Dépassé</span>' : sapM>18 ? '<span class="orange">↗ À planifier</span>' : '<span class="green">✓ OK</span>';
+  html += '<div class="fc"><div><div class="fc-name">Recyclage SAP</div><div class="fc-date">' + fmt(a.sap) + '</div></div>' + sapSt + '</div>';
+  var incM = monthsAgo(a.inc);
+  var incSt = !a.inc ? '<span class="orange">⚠ Manquant</span>' : incM>18 ? '<span class="red">⚠ Dépassé</span>' : '<span class="green">✓ OK</span>';
+  html += '<div class="fc"><div><div class="fc-name">Recyclage INC</div><div class="fc-date">' + fmt(a.inc) + '</div></div>' + incSt + '</div>';
+  var medM = monthsAgo(a.med);
+  var medSt = !a.med ? '<span class="orange">⚠ Manquante</span>' : medM>12 ? '<span class="red">⚠ Dépassée</span>' : medM>9 ? '<span class="orange">↗ Bientôt</span>' : '<span class="green">✓ OK</span>';
+  html += '<div class="fc"><div><div class="fc-name">Visite médicale</div><div class="fc-date">' + fmt(a.med) + '</div></div>' + medSt + '</div>';
+  if (a.contact) {
+    html += '<div class="sec-lbl">Contact d\'urgence</div><div class="ig"><div><div class="ir-lbl">Personne</div><div class="ir-val">' + a.contact + '</div></div><div><div class="ir-lbl">Téléphone</div><div class="ir-val">' + a.ctTel + '</div></div></div>';
+  }
+  if (a.notes) {
+    html += '<div class="sec-lbl">Remarques</div><p style="font-size:13px;color:#888">' + a.notes + '</p>';
+  }
+  html += '<div class="btn-row"><button class="btn btn-primary" onclick="openEdit(' + i + ')">✏ Modifier</button><button class="btn" onclick="closeOverlay()">Fermer</button></div>';
+  document.getElementById('drawer').innerHTML = html;
+  document.getElementById('overlay').classList.add('open');
+}
+
+function openEdit(i) {
+  var a = DATA[i];
+  var t = getTeam(a);
+  var grades = ['Ltn','ADC','ADJ','SCH','SGT','CCH','CPL','1CL','SAP','IPR','ISP'];
+  var statuts = ['SPV','SPP','PATS','SAISONNIER'];
+  function gradeOpts() { return grades.map(function(g){return '<option'+(a.grade===g?' selected':'')+'>'+g+'</option>';}).join(''); }
+  function statOpts() { return statuts.map(function(s){return '<option'+(a.statut===s?' selected':'')+'>'+s+'</option>';}).join(''); }
+  function teamOpts() {
+    var o = '<option value="0"'+(t===0?' selected':'')+'>Non affecté</option>';
+    for(var n=1;n<=4;n++) o += '<option value="'+n+'"'+(t===n?' selected':'') + '>Équipe '+n+'</option>';
+    return o;
+  }
+  var html = '<div class="drawer-hdr"><h2>Modifier — '+a.nom+' '+a.prenom+'</h2><button class="x-btn" onclick="closeOverlay()">×</button></div>';
+  html += '<div class="edit-form"><div class="ig">';
+  html += '<div><label>Nom</label><input id="en" value="'+a.nom+'"></div>';
+  html += '<div><label>Prénom</label><input id="ep" value="'+a.prenom+'"></div>';
+  html += '<div><label>Date de naissance</label><input id="enaiss" value="'+(a.naissance||'')+'"></div>';
+  html += '<div><label>Entrée au CIS</label><input id="ecis" value="'+(a.entree_cis||'')+'"></div>';
+  html += '<div><label>Grade</label><select id="eg">'+gradeOpts()+'</select></div>';
+  html += '<div><label>Statut</label><select id="es">'+statOpts()+'</select></div>';
+  html += '<div><label>Équipe</label><select id="et">'+teamOpts()+'</select></div>';
+  html += '<div><label>Aptitude</label><input id="ea" value="'+a.aptitude+'"></div>';
+  html += '<div><label>Téléphone</label><input id="etl" value="'+a.tel+'"></div>';
+  html += '<div><label>Email</label><input id="eem" value="'+a.email+'"></div>';
+  html += '<div style="grid-column:span 2"><label>Fonctions</label><input id="ef" value="'+a.fonctions+'"></div>';
+  html += '<div style="grid-column:span 2"><label>Qualifications</label><input id="eq2" value="'+a.qualifs+'"></div>';
+  html += '<div><label>Dernier SAP (JJ/MM/AAAA)</label><input id="esap" value="'+(a.sap?fmt(a.sap):'')+'"></div>';
+  html += '<div><label>Dernier INC</label><input id="einc" value="'+(a.inc?fmt(a.inc):'')+'"></div>';
+  html += '<div><label>Visite médicale</label><input id="emed" value="'+(a.med?fmt(a.med):'')+'"></div>';
+  html += '<div><label>BIP</label><input id="ebip" value="'+a.bip+'"></div>';
+  html += '<div><label>Contact urgence</label><input id="ect" value="'+a.contact+'"></div>';
+  html += '<div><label>Tél. urgence</label><input id="ectl" value="'+a.ctTel+'"></div>';
+  html += '<div style="grid-column:span 2"><label>Remarques</label><input id="enotes" value="'+a.notes+'"></div>';
+  html += '</div>';
+  html += '<div class="btn-row"><button class="btn btn-primary" onclick="saveEdit('+i+')">💾 Enregistrer</button><button class="btn" onclick="openAgent('+i+')">Annuler</button></div>';
+  html += '</div>';
+  document.getElementById('drawer').innerHTML = html;
+}
+
+function saveEdit(i) {
+  var a = DATA[i];
+  a.nom = document.getElementById('en').value.trim().toUpperCase();
+  a.prenom = document.getElementById('ep').value.trim();
+  a.naissance = document.getElementById('enaiss').value.trim();
+  a.entree_cis = document.getElementById('ecis').value.trim();
+  a.grade = document.getElementById('eg').value;
+  a.statut = document.getElementById('es').value;
+  a.aptitude = document.getElementById('ea').value.trim();
+  a.tel = document.getElementById('etl').value.trim();
+  a.email = document.getElementById('eem').value.trim();
+  a.fonctions = document.getElementById('ef').value.trim();
+  a.qualifs = document.getElementById('eq2').value.trim();
+  a.sap = parseMyDate(document.getElementById('esap').value);
+  a.inc = parseMyDate(document.getElementById('einc').value);
+  a.med = parseMyDate(document.getElementById('emed').value);
+  a.bip = document.getElementById('ebip').value.trim();
+  a.contact = document.getElementById('ect').value.trim();
+  a.ctTel = document.getElementById('ectl').value.trim();
+  a.notes = document.getElementById('enotes').value.trim();
+  var nt = +document.getElementById('et').value;
+  setTeam(a.nom, a.prenom, nt);
+  cloudSave();
+  applyFilters();
+  updateStats();
+  openAgent(i);
+}
+
+function openNew() {
+  DATA.push({nom:'NOUVEAU',prenom:'Agent',grade:'1CL',statut:'SPV',fonctions:'',qualifs:'',sap:null,inc:null,med:null,aptitude:'',tel:'',email:'',adresse:'',mat:'',contact:'',ctTel:'',permB:true,permC:false,permCE:false,bip:'',notes:''});
+  openEdit(DATA.length - 1);
+  document.getElementById('overlay').classList.add('open');
+}
+
+function closeOverlay() { document.getElementById('overlay').classList.remove('open'); }
+function maybeClose(e) { if (e.target === document.getElementById('overlay')) closeOverlay(); }
+
+function showTab(name) {
+  var names = ['liste','equipes','formations'];
+  document.querySelectorAll('.tab').forEach(function(t,i){ t.classList.toggle('active', names[i]===name); });
+  document.querySelectorAll('.panel').forEach(function(p){ p.classList.remove('active'); });
+  document.getElementById('panel-'+name).classList.add('active');
+  if (name === 'equipes') renderTeams();
+  if (name === 'formations') renderAlerts();
+}
+
+// ── JSONBin Cloud Storage ──────────────────────────────────────
+var JSONBIN_API_KEY = '$2a$10$e1D6odQKIuybtKMHq0d0EeRDHy5p4TzU9sC3Zoj/S.lO7J0tyCWYK';
+var JSONBIN_BIN_ID  = null; // sera créé automatiquement au premier lancement
+var JSONBIN_ID_KEY  = 'cis_ruoms_bin_id'; // on stocke l'ID du bin en localStorage
+
+function setSyncStatus(state, msg) {
+  var el = document.getElementById('syncStatus');
+  if (!el) return;
+  var colors = {ok:'#1a7a3a', saving:'#e07000', err:'#cc3300', loading:'#1a5fa8'};
+  el.textContent = msg;
+  el.style.background = colors[state] || '#888';
+}
+
+function serialise() {
+  return {
+    data: DATA.map(function(a) {
+      var o = Object.assign({}, a);
+      o.sap = a.sap ? a.sap.toISOString() : null;
+      o.inc = a.inc ? a.inc.toISOString() : null;
+      o.med = a.med ? a.med.toISOString() : null;
+      return o;
+    }),
+    teams: TEAMS
+  };
+}
+
+function deserialise(obj) {
+  DATA = (obj.data || []).map(function(a) {
+    a.sap = a.sap ? new Date(a.sap) : null;
+    a.inc = a.inc ? new Date(a.inc) : null;
+    a.med = a.med ? new Date(a.med) : null;
+    return a;
+  });
+  if (obj.teams) {
+    for (var k in obj.teams) TEAMS[k] = obj.teams[k];
+  }
+}
+
+async function cloudSave() {
+  setSyncStatus('saving', '⟳ Sauvegarde...');
+  var payload = serialise();
+  try {
+    if (!JSONBIN_BIN_ID) {
+      // Premier lancement : créer le bin
+      var res = await fetch('https://api.jsonbin.io/v3/b', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Master-Key': JSONBIN_API_KEY,
+          'X-Bin-Name': 'CIS-Ruoms-Personnel',
+          'X-Bin-Private': 'true'
+        },
+        body: JSON.stringify(payload)
+      });
+      var json = await res.json();
+      JSONBIN_BIN_ID = json.metadata.id;
+      localStorage.setItem(JSONBIN_ID_KEY, JSONBIN_BIN_ID);
+    } else {
+      // Mise à jour du bin existant
+      await fetch('https://api.jsonbin.io/v3/b/' + JSONBIN_BIN_ID, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Master-Key': JSONBIN_API_KEY
+        },
+        body: JSON.stringify(payload)
+      });
+    }
+    setSyncStatus('ok', '✓ Sauvegardé en ligne');
+  } catch(e) {
+    setSyncStatus('err', '⚠ Erreur sauvegarde');
+    console.error(e);
+  }
+}
+
+async function cloudLoad() {
+  // Récupérer l'ID du bin depuis localStorage
+  JSONBIN_BIN_ID = localStorage.getItem(JSONBIN_ID_KEY) || null;
+  if (!JSONBIN_BIN_ID) {
+    // Chercher un bin existant par nom
+    try {
+      var res = await fetch('https://api.jsonbin.io/v3/b?page=1&perPage=10', {
+        headers: { 'X-Master-Key': JSONBIN_API_KEY }
+      });
+      // pas d'endpoint liste, on part des données par défaut
+    } catch(e) {}
+    return; // Utilisera les données par défaut
+  }
+  try {
+    setSyncStatus('loading', '⟳ Chargement...');
+    var res = await fetch('https://api.jsonbin.io/v3/b/' + JSONBIN_BIN_ID + '/latest', {
+      headers: { 'X-Master-Key': JSONBIN_API_KEY }
+    });
+    var json = await res.json();
+    if (json.record) {
+      deserialise(json.record);
+    }
+    setSyncStatus('ok', '✓ Synchronisé');
+  } catch(e) {
+    setSyncStatus('err', '⚠ Hors ligne - données locales');
+    console.error(e);
+  }
+}
+
+// ── Init ───────────────────────────────────────────────────────
+(async function init() {
+  await cloudLoad();
+  view = DATA.slice();
+  updateStats();
+  renderTable();
+})();
+</script>
+</body>
+</html>
