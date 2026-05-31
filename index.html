@@ -570,6 +570,7 @@ async function cloudSave() {
       // Premier lancement : créer le bin
       var res = await fetch('https://api.jsonbin.io/v3/b', {
         method: 'POST',
+        mode: 'cors',
         headers: {
           'Content-Type': 'application/json',
           'X-Master-Key': JSONBIN_API_KEY,
@@ -578,53 +579,49 @@ async function cloudSave() {
         },
         body: JSON.stringify(payload)
       });
+      if (!res.ok) throw new Error('HTTP ' + res.status + ' - ' + await res.text());
       var json = await res.json();
       JSONBIN_BIN_ID = json.metadata.id;
       localStorage.setItem(JSONBIN_ID_KEY, JSONBIN_BIN_ID);
     } else {
       // Mise à jour du bin existant
-      await fetch('https://api.jsonbin.io/v3/b/' + JSONBIN_BIN_ID, {
+      var res2 = await fetch('https://api.jsonbin.io/v3/b/' + JSONBIN_BIN_ID, {
         method: 'PUT',
+        mode: 'cors',
         headers: {
           'Content-Type': 'application/json',
           'X-Master-Key': JSONBIN_API_KEY
         },
         body: JSON.stringify(payload)
       });
+      if (!res2.ok) throw new Error('HTTP ' + res2.status + ' - ' + await res2.text());
     }
     setSyncStatus('ok', '✓ Sauvegardé en ligne');
   } catch(e) {
-    setSyncStatus('err', '⚠ Erreur sauvegarde');
-    console.error(e);
+    setSyncStatus('err', '⚠ Erreur: ' + e.message.substring(0,40));
+    console.error('cloudSave error:', e);
   }
 }
 
 async function cloudLoad() {
-  // Récupérer l'ID du bin depuis localStorage
   JSONBIN_BIN_ID = localStorage.getItem(JSONBIN_ID_KEY) || null;
-  if (!JSONBIN_BIN_ID) {
-    // Chercher un bin existant par nom
-    try {
-      var res = await fetch('https://api.jsonbin.io/v3/b?page=1&perPage=10', {
-        headers: { 'X-Master-Key': JSONBIN_API_KEY }
-      });
-      // pas d'endpoint liste, on part des données par défaut
-    } catch(e) {}
-    return; // Utilisera les données par défaut
-  }
+  if (!JSONBIN_BIN_ID) return;
   try {
     setSyncStatus('loading', '⟳ Chargement...');
     var res = await fetch('https://api.jsonbin.io/v3/b/' + JSONBIN_BIN_ID + '/latest', {
-      headers: { 'X-Master-Key': JSONBIN_API_KEY }
+      method: 'GET',
+      mode: 'cors',
+      headers: {
+        'X-Master-Key': JSONBIN_API_KEY
+      }
     });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
     var json = await res.json();
-    if (json.record) {
-      deserialise(json.record);
-    }
+    if (json.record) deserialise(json.record);
     setSyncStatus('ok', '✓ Synchronisé');
   } catch(e) {
     setSyncStatus('err', '⚠ Hors ligne - données locales');
-    console.error(e);
+    console.error('cloudLoad error:', e);
   }
 }
 
