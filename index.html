@@ -483,6 +483,11 @@ tbody tr.row-alert td:first-child{border-left:3px solid #cc3300}
       <p style="font-size:11px;color:#aaa;margin-top:5px">Les rappels s'affichent X jours avant l'échéance.</p>
     </div>
     <div class="form-section">
+      <div class="form-section-title">Partage avec un collègue</div>
+      <button class="btn btn-sm btn-primary" onclick="copyShareLink()">🔗 Copier le lien de partage</button>
+      <p style="font-size:11px;color:#aaa;margin-top:5px">Envoyez ce lien à votre adjoint : il verra et modifiera exactement les mêmes données que vous. Il aura aussi besoin du code PIN.</p>
+    </div>
+    <div class="form-section">
       <div class="form-section-title">Sauvegarde de secours</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-sm" onclick="exportBackupJSON()">💾 Télécharger une sauvegarde</button>
@@ -1379,6 +1384,13 @@ async function cloudSave(){
   }catch(e){setSyncStatus('err','⚠ Erreur: '+e.message.substring(0,30));console.error(e);}
 }
 async function cloudLoad(){
+  // Si le lien contient #bin=xxx (lien de partage), on l'utilise et on le mémorise
+  const hashMatch=location.hash.match(/bin=([a-f0-9]+)/i);
+  if(hashMatch){
+    localStorage.setItem(JSONBIN_ID_KEY,hashMatch[1]);
+    // Nettoyer l'URL pour ne pas laisser le bin ID visible
+    history.replaceState(null,'',location.pathname+location.search);
+  }
   BIN_ID=localStorage.getItem(JSONBIN_ID_KEY)||null;if(!BIN_ID)return;
   try{
     setSyncStatus('loading','⟳ Chargement…');
@@ -1569,6 +1581,17 @@ function saveVehicule(i){
 function deleteVehicule(i){
   if(!confirm('Supprimer le véhicule '+VEHICULES[i].nom+' ?'))return;
   VEHICULES.splice(i,1);cloudSave();renderVehicules();
+}
+
+// ── LIEN DE PARTAGE ───────────────────────────────────────────
+function copyShareLink(){
+  if(!BIN_ID){showToast('Faites d\'abord une modification pour créer la base de données','error');return;}
+  const link=location.origin+location.pathname+'#bin='+BIN_ID;
+  navigator.clipboard.writeText(link).then(()=>{
+    showToast('Lien copié ! Envoyez-le à votre adjoint 📋','success');
+  }).catch(()=>{
+    prompt('Copiez ce lien et envoyez-le à votre adjoint :',link);
+  });
 }
 
 // ── SAUVEGARDE JSON ───────────────────────────────────────────
