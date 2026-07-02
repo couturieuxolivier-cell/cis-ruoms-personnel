@@ -229,6 +229,34 @@ tbody tr.row-alert td:first-child{border-left:3px solid #cc3300}
 .pin-btn.del{font-size:16px;color:#888}
 .pin-error{color:#cc3300;font-size:12px;font-weight:600;min-height:18px;margin-top:-10px}
 .pin-footer{color:rgba(255,255,255,.6);font-size:11px;margin-top:8px}
+
+/* ── MOBILE ── */
+@media(max-width:768px){
+  .container{padding:10px}
+  .stats{grid-template-columns:repeat(2,1fr);gap:8px}
+  .stat-val{font-size:18px}
+  .tabs{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{padding:9px 12px;font-size:12px;flex-shrink:0}
+  .toolbar input{width:100%;flex:1 1 100%}
+  .toolbar select{flex:1 1 45%}
+  .toolbar .btn{flex:1 1 auto}
+  #panel-liste,#panel-gardes,#panel-vehicules{overflow-x:auto}
+  table{min-width:800px}
+  .team-grid{grid-template-columns:1fr}
+  .dash-grid{grid-template-columns:1fr!important}
+  .drawer{width:100%;padding:1rem;border-radius:10px 10px 0 0;margin-bottom:0}
+  .overlay{padding:16px 0 0;align-items:flex-end}
+  .ig{grid-template-columns:1fr}
+  .fc-grid{grid-template-columns:1fr}
+  header{padding:10px 14px}
+  header h1{font-size:14px}
+  .hbadge{font-size:10px;padding:2px 6px}
+  .cal-day{min-height:44px;font-size:9px}
+  .rappel-card{flex-wrap:wrap}
+  .rappel-countdown{min-width:auto}
+  .pin-box{width:290px;padding:2rem 1.5rem}
+}
 </style>
 </head>
 <body>
@@ -296,12 +324,14 @@ tbody tr.row-alert td:first-child{border-left:3px solid #cc3300}
   </div>
 
   <div class="tabs">
-    <button class="tab active" onclick="showTab('liste')">👥 Liste agents</button>
-    <button class="tab" onclick="showTab('rappels')">🔔 Rappels<span class="tab-badge" id="badge-rappels" style="display:none">0</span></button>
-    <button class="tab" onclick="showTab('equipes')">🔴 Équipes de garde</button>
-    <button class="tab" onclick="showTab('formations')">📋 Formations<span class="tab-badge orange" id="badge-formations" style="display:none">0</span></button>
-    <button class="tab" onclick="showTab('calendrier')">📅 Calendrier</button>
-    <button class="tab" onclick="showTab('tableau')">📊 Tableau de bord</button>
+    <button class="tab active" data-tab="liste" onclick="showTab('liste')">👥 Liste agents</button>
+    <button class="tab" data-tab="rappels" onclick="showTab('rappels')">🔔 Rappels<span class="tab-badge" id="badge-rappels" style="display:none">0</span></button>
+    <button class="tab" data-tab="gardes" onclick="showTab('gardes')">🗓 Planning gardes</button>
+    <button class="tab" data-tab="equipes" onclick="showTab('equipes')">🔴 Équipes</button>
+    <button class="tab" data-tab="formations" onclick="showTab('formations')">📋 Formations<span class="tab-badge orange" id="badge-formations" style="display:none">0</span></button>
+    <button class="tab" data-tab="calendrier" onclick="showTab('calendrier')">📅 Calendrier</button>
+    <button class="tab" data-tab="vehicules" onclick="showTab('vehicules')">🚒 Véhicules<span class="tab-badge orange" id="badge-vehicules" style="display:none">0</span></button>
+    <button class="tab" data-tab="tableau" onclick="showTab('tableau')">📊 Tableau de bord</button>
   </div>
 
   <!-- LISTE -->
@@ -334,6 +364,8 @@ tbody tr.row-alert td:first-child{border-left:3px solid #cc3300}
       </select>
       <button class="btn btn-primary" onclick="openNew()">+ Ajouter</button>
       <button class="btn" onclick="exportCSV()">📤 CSV</button>
+      <button class="btn" onclick="document.getElementById('csvImportInput').click()">📥 Importer CSV</button>
+      <input type="file" id="csvImportInput" accept=".csv" style="display:none" onchange="importCSV(this)">
       <button class="btn" onclick="window.print()">🖨 Imprimer</button>
     </div>
     <table id="mainTable">
@@ -396,6 +428,23 @@ tbody tr.row-alert td:first-child{border-left:3px solid #cc3300}
     <div id="calContent"></div>
   </div>
 
+  <!-- PLANNING GARDES -->
+  <div id="panel-gardes" class="panel">
+    <div class="rappel-toolbar">
+      <div class="rappel-toolbar-title">🗓 Planning des gardes week-end (12 prochaines semaines)</div>
+      <button class="btn btn-sm" onclick="exportGardesCSV()">📤 Export CSV</button>
+    </div>
+    <div id="gardesContent"></div>
+  </div>
+
+  <!-- VÉHICULES -->
+  <div id="panel-vehicules" class="panel">
+    <div class="toolbar">
+      <button class="btn btn-primary" onclick="openNewVehicule()">+ Ajouter un véhicule</button>
+    </div>
+    <div id="vehiculesContent"></div>
+  </div>
+
   <!-- TABLEAU DE BORD -->
   <div id="panel-tableau" class="panel">
     <div id="dashboard"></div>
@@ -433,6 +482,15 @@ tbody tr.row-alert td:first-child{border-left:3px solid #cc3300}
       <input type="number" id="s-window" min="1" max="90" value="30" style="width:120px;padding:7px 9px;border:1px solid #ddd;border-radius:5px;font-size:13px">
       <p style="font-size:11px;color:#aaa;margin-top:5px">Les rappels s'affichent X jours avant l'échéance.</p>
     </div>
+    <div class="form-section">
+      <div class="form-section-title">Sauvegarde de secours</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-sm" onclick="exportBackupJSON()">💾 Télécharger une sauvegarde</button>
+        <button class="btn btn-sm" onclick="document.getElementById('jsonImportInput').click()">📥 Restaurer une sauvegarde</button>
+        <input type="file" id="jsonImportInput" accept=".json" style="display:none" onchange="importBackupJSON(this)">
+      </div>
+      <p style="font-size:11px;color:#aaa;margin-top:5px">Téléchargez régulièrement une sauvegarde par sécurité. La restauration remplace toutes les données.</p>
+    </div>
     <div class="btn-row">
       <button class="btn btn-primary" onclick="saveSettings()">💾 Enregistrer</button>
       <button class="btn" onclick="closeSettings()">Annuler</button>
@@ -445,7 +503,7 @@ tbody tr.row-alert td:first-child{border-left:3px solid #cc3300}
 
 <script>
 // ── TODAY ─────────────────────────────────────────────────────
-const TODAY = new Date(2026,4,31); // 31 mai 2026
+const TODAY = new Date(); TODAY.setHours(0,0,0,0); // Date du jour automatique
 const TOMORROW = new Date(TODAY); TOMORROW.setDate(TOMORROW.getDate()+1);
 
 // ── Persistence ───────────────────────────────────────────────
@@ -813,6 +871,38 @@ function renderRappels(){
 
   if(!html){html='<div class="rappel-empty">✅ Aucune échéance dans les prochains '+window+' jours.<br><span style="font-size:12px">Augmentez la fenêtre de rappel dans les paramètres (⚙️) pour voir plus loin.</span></div>';}
 
+  // 🎂 Anniversaires du mois
+  const moisActuel=TODAY.getMonth()+1;
+  const annivs=[];
+  DATA.forEach((a,i)=>{
+    if(a.naissance){
+      const p=a.naissance.split('/');
+      if(p.length===3&&+p[1]===moisActuel){
+        const futureAge=TODAY.getFullYear()-(+p[2]);
+        annivs.push({a,i,jour:+p[0],type:'anniv',label:'🎂 '+(+p[0])+'/'+moisActuel+' — fêtera ses '+futureAge+' ans'});
+      }
+    }
+    if(a.entree_cis){
+      const p=a.entree_cis.split('/');
+      if(p.length===3&&+p[1]===moisActuel){
+        const years=TODAY.getFullYear()-(+p[2]);
+        if(years>0&&years%5===0)annivs.push({a,i,jour:+p[0],type:'engagement',label:'🎖 '+(+p[0])+'/'+moisActuel+' — '+years+' ans d\'engagement (renouvellement ?)'});
+      }
+    }
+  });
+  if(annivs.length){
+    annivs.sort((x,y)=>x.jour-y.jour);
+    html+='<div class="rappel-section"><div class="rappel-section-hdr"><div class="rappel-section-title">🎉 Anniversaires & engagements ce mois-ci</div><span class="rappel-section-count">'+annivs.length+'</span></div>';
+    annivs.forEach(({a,i,label})=>{
+      html+='<div class="rappel-card future" style="border-left-color:#3a2a9a">'+
+        '<div class="rappel-avatar" style="background:'+avatarColor(a.nom)+'">'+inits(a)+'</div>'+
+        '<div class="rappel-info"><div class="rappel-name">'+a.nom+' '+a.prenom+'</div>'+
+        '<div class="rappel-detail">'+label+'</div></div>'+
+        '<div class="rappel-actions"><button class="btn btn-sm" onclick="openAgent('+i+')">👁</button></div></div>';
+    });
+    html+='</div>';
+  }
+
   document.getElementById('rappelContent').innerHTML=html;
   updateNotifStatus();
 }
@@ -1142,7 +1232,7 @@ function openAgent(i){
     html+=a.historique.slice().reverse().map(h=>'<div class="hist-item'+(h.type==='rappel'?' rappel':'')+'"><div class="hist-date">'+h.date+'</div>'+h.texte+'</div>').join('');
   }else{html+='<p style="font-size:12px;color:#aaa;margin-bottom:8px">Aucune entrée.</p>';}
   html+='<div style="display:flex;gap:8px;margin-top:8px"><input id="newHistTxt" type="text" placeholder="Ajouter une note d\'historique…" style="flex:1;padding:7px 9px;border:1px solid #ddd;border-radius:5px;font-size:12px"><button class="btn" onclick="addHistorique('+i+')" style="font-size:12px">+ Ajouter</button></div>';
-  html+='<div class="btn-row"><button class="btn btn-primary" onclick="openEdit('+i+')">✏ Modifier</button><button class="btn btn-danger" onclick="deleteAgent('+i+')">🗑 Supprimer</button><button class="btn" onclick="closeOverlay()">Fermer</button></div>';
+  html+='<div class="btn-row"><button class="btn btn-primary" onclick="openEdit('+i+')">✏ Modifier</button><button class="btn" onclick="printFiche('+i+')">🖨 Fiche PDF</button><button class="btn btn-danger" onclick="deleteAgent('+i+')">🗑 Supprimer</button><button class="btn" onclick="closeOverlay()">Fermer</button></div>';
   document.getElementById('drawer').innerHTML=html;
   document.getElementById('overlay').classList.add('open');
 }
@@ -1252,8 +1342,7 @@ function closeOverlay(){document.getElementById('overlay').classList.remove('ope
 function maybeClose(e){if(e.target===document.getElementById('overlay'))closeOverlay();}
 
 function showTab(name){
-  const names=['liste','rappels','equipes','formations','calendrier','tableau'];
-  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',names[i]===name));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('panel-'+name).classList.add('active');
   if(name==='equipes')renderTeams();
@@ -1261,16 +1350,20 @@ function showTab(name){
   if(name==='rappels')renderRappels();
   if(name==='calendrier')renderCalendrier();
   if(name==='tableau')renderDashboard();
+  if(name==='gardes')renderGardes();
+  if(name==='vehicules')renderVehicules();
 }
 
 // ── JSONBin ───────────────────────────────────────────────────
 var BIN_ID=null;
 var needSave=false;
 function setSyncStatus(s,m){const el=document.getElementById('syncStatus');if(!el)return;el.textContent=m;el.style.background={ok:'rgba(26,122,58,.5)',saving:'rgba(224,112,0,.5)',err:'rgba(204,51,0,.5)',loading:'rgba(255,255,255,.2)'}[s]||'rgba(255,255,255,.2)';}
-function serialise(){return{data:DATA.map(a=>{const o=Object.assign({},a);o.historique=a.historique||[];return o;}),teams:TEAMS};}
+function serialise(){return{data:DATA.map(a=>{const o=Object.assign({},a);o.historique=a.historique||[];return o;}),teams:TEAMS,planning:PLANNING,vehicules:VEHICULES};}
 function deserialise(obj){
   DATA=(obj.data||[]).map(a=>{if(!a.historique)a.historique=[];if(!a.dispo)a.dispo='dispo';if(!a.fdf)a.fdf=null;return a;});
   if(obj.teams)for(const k in obj.teams)TEAMS[k]=obj.teams[k];
+  if(obj.planning)PLANNING=obj.planning;
+  if(obj.vehicules)VEHICULES=obj.vehicules;
 }
 async function cloudSave(){
   setSyncStatus('saving','⟳ Sauvegarde…');
@@ -1332,6 +1425,274 @@ const FORCED_AGENTS = [
   updateNotifStatus();
   if(needSave){ setTimeout(()=>cloudSave(),1000); }
 })();
+
+
+// ── PLANNING GARDES ───────────────────────────────────────────
+var PLANNING = {}; // {"2026-06-06": {eq: 2, notes: ""}}
+
+function getWeekends(n){
+  // Retourne les n prochains samedis
+  const list=[];
+  const d=new Date(TODAY);
+  // Aller au prochain samedi (ou aujourd'hui si samedi)
+  while(d.getDay()!==6)d.setDate(d.getDate()+1);
+  for(let i=0;i<n;i++){
+    list.push(new Date(d));
+    d.setDate(d.getDate()+7);
+  }
+  return list;
+}
+function weekendKey(d){return d.toISOString().split('T')[0];}
+
+function renderGardes(){
+  const el=document.getElementById('gardesContent');if(!el)return;
+  const weekends=getWeekends(12);
+  // Compteur par équipe
+  const counts={1:0,2:0,3:0,4:0};
+  Object.values(PLANNING).forEach(p=>{if(p.eq&&counts[p.eq]!==undefined)counts[p.eq]++;});
+  let html='<div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">';
+  for(let t=1;t<=4;t++){
+    html+='<div class="stat" style="flex:1;min-width:120px"><div class="stat-lbl">Équipe '+t+' — gardes planifiées</div><div class="stat-val">'+counts[t]+'</div></div>';
+  }
+  html+='</div>';
+  html+='<table><thead><tr><th style="width:150px">Week-end du</th><th style="width:140px">Équipe de garde</th><th style="width:110px">Effectif dispo</th><th>Alerte</th><th style="width:220px">Notes</th></tr></thead><tbody>';
+  weekends.forEach(we=>{
+    const key=weekendKey(we);
+    const p=PLANNING[key]||{eq:0,notes:''};
+    const dim=new Date(we);dim.setDate(dim.getDate()+1);
+    const label=we.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'})+' – '+dim.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});
+    let dispoCell='—',alertCell='';
+    if(p.eq>0){
+      const members=DATA.filter(a=>getTeam(a)===p.eq);
+      const dispo=members.filter(a=>a.dispo==='dispo').length;
+      const cls=dispo>=members.length*0.75?'green':dispo>=members.length*0.5?'orange':'red';
+      dispoCell='<span class="'+cls+'" style="font-weight:700">'+dispo+'/'+members.length+'</span>';
+      const indispos=members.filter(a=>a.dispo!=='dispo');
+      if(indispos.length)alertCell=indispos.map(a=>'<span class="pill p-warn" style="margin-right:3px">'+a.nom+' '+a.prenom[0]+'. ('+({conge:'congé',indispo:'indispo',suspendu:'suspendu'}[a.dispo]||a.dispo)+')</span>').join('');
+      else alertCell='<span class="pill p-ok">✓ Équipe complète</span>';
+    }
+    const opts='<option value="0"'+(p.eq===0?' selected':'')+'>—</option>'+[1,2,3,4].map(t=>'<option value="'+t+'"'+(p.eq===t?' selected':'')+'>Équipe '+t+'</option>').join('');
+    html+='<tr>'+
+      '<td style="font-weight:700">'+label+'</td>'+
+      '<td><select onchange="setGarde(\''+key+'\',+this.value)" style="padding:5px 8px;border:1px solid #ccc;border-radius:5px;font-size:12px">'+opts+'</select></td>'+
+      '<td>'+dispoCell+'</td>'+
+      '<td style="white-space:normal">'+alertCell+'</td>'+
+      '<td><input value="'+((p.notes||'').replace(/"/g,'&quot;'))+'" onchange="setGardeNote(\''+key+'\',this.value)" placeholder="Notes…" style="width:100%;padding:5px 8px;border:1px solid #eee;border-radius:5px;font-size:12px"></td>'+
+    '</tr>';
+  });
+  html+='</tbody></table>';
+  el.innerHTML=html;
+}
+function setGarde(key,eq){
+  if(!PLANNING[key])PLANNING[key]={eq:0,notes:''};
+  PLANNING[key].eq=eq;
+  cloudSave();renderGardes();
+}
+function setGardeNote(key,notes){
+  if(!PLANNING[key])PLANNING[key]={eq:0,notes:''};
+  PLANNING[key].notes=notes;
+  cloudSave();
+}
+function exportGardesCSV(){
+  const weekends=getWeekends(12);
+  const cols=['Week-end du','Équipe','Notes'];
+  const rows=weekends.map(we=>{
+    const key=weekendKey(we);const p=PLANNING[key]||{eq:0,notes:''};
+    return[we.toLocaleDateString('fr-FR'),p.eq?('Équipe '+p.eq):'—',p.notes||''];
+  });
+  downloadCSV('planning_gardes_cis_ruoms.csv',cols,rows);
+  showToast('Planning exporté','success');
+}
+
+// ── VÉHICULES ─────────────────────────────────────────────────
+var VEHICULES = []; // {nom, immat, ct, revision, notes}
+
+function renderVehicules(){
+  const el=document.getElementById('vehiculesContent');if(!el)return;
+  // Badge
+  const alerts=VEHICULES.filter(v=>{
+    const ctd=v.ct?daysUntil(v.ct):null;const rvd=v.revision?daysUntil(v.revision):null;
+    return(ctd!==null&&ctd<60)||(rvd!==null&&rvd<60);
+  }).length;
+  const b=document.getElementById('badge-vehicules');
+  if(b){b.textContent=alerts;b.style.display=alerts?'':'none';}
+  if(!VEHICULES.length){el.innerHTML='<div class="rappel-empty">Aucun véhicule enregistré.<br><span style="font-size:12px">Cliquez sur "+ Ajouter un véhicule" pour commencer (ex : VSAV, FPT, CCF…)</span></div>';return;}
+  let html='<table><thead><tr><th style="width:120px">Véhicule</th><th style="width:110px">Immatriculation</th><th style="width:130px">Contrôle technique</th><th style="width:130px">Prochaine révision</th><th>Notes</th><th style="width:110px">Actions</th></tr></thead><tbody>';
+  VEHICULES.forEach((v,i)=>{
+    function dcell(d){
+      if(!d)return'<span class="muted">—</span>';
+      const days=daysUntil(d);
+      const cls=days<0?'red':days<60?'orange':'green';
+      const suffix=days<0?' (dépassé !)':days<60?' (J-'+days+')':'';
+      return'<span class="'+cls+'" style="font-weight:600">'+fmt(d)+suffix+'</span>';
+    }
+    html+='<tr>'+
+      '<td style="font-weight:700">🚒 '+v.nom+'</td>'+
+      '<td>'+(v.immat||'—')+'</td>'+
+      '<td>'+dcell(v.ct)+'</td>'+
+      '<td>'+dcell(v.revision)+'</td>'+
+      '<td class="muted" style="white-space:normal">'+(v.notes||'—')+'</td>'+
+      '<td><button class="btn btn-sm" onclick="editVehicule('+i+')">✏</button> <button class="btn btn-sm btn-danger" onclick="deleteVehicule('+i+')">🗑</button></td>'+
+    '</tr>';
+  });
+  html+='</tbody></table>';
+  el.innerHTML=html;
+}
+function openNewVehicule(){
+  VEHICULES.push({nom:'NOUVEAU',immat:'',ct:null,revision:null,notes:''});
+  editVehicule(VEHICULES.length-1);
+}
+function editVehicule(i){
+  const v=VEHICULES[i];
+  let html='<div class="drawer-hdr"><h2>🚒 '+v.nom+'</h2><button class="x-btn" onclick="closeOverlay();renderVehicules()">×</button></div>';
+  html+='<div class="edit-form"><div class="form-section"><div class="ig">';
+  html+='<div><label>Nom (ex : VSAV, FPT, CCF)</label><input id="vnom" value="'+(v.nom||'').replace(/"/g,'&quot;')+'"></div>';
+  html+='<div><label>Immatriculation</label><input id="vimmat" value="'+(v.immat||'').replace(/"/g,'&quot;')+'"></div>';
+  html+='<div><label>Contrôle technique (JJ/MM/AAAA)</label><input id="vct" value="'+(v.ct?fmt(v.ct):'')+'"></div>';
+  html+='<div><label>Prochaine révision (JJ/MM/AAAA)</label><input id="vrev" value="'+(v.revision?fmt(v.revision):'')+'"></div>';
+  html+='<div style="grid-column:span 2"><label>Notes</label><input id="vnotes" value="'+(v.notes||'').replace(/"/g,'&quot;')+'"></div>';
+  html+='</div></div>';
+  html+='<div class="btn-row"><button class="btn btn-primary" onclick="saveVehicule('+i+')">💾 Enregistrer</button><button class="btn" onclick="closeOverlay();renderVehicules()">Annuler</button></div></div>';
+  document.getElementById('drawer').innerHTML=html;
+  document.getElementById('overlay').classList.add('open');
+}
+function saveVehicule(i){
+  const v=VEHICULES[i];
+  v.nom=document.getElementById('vnom').value.trim().toUpperCase();
+  v.immat=document.getElementById('vimmat').value.trim().toUpperCase();
+  v.ct=parseMyDate(document.getElementById('vct').value);
+  v.revision=parseMyDate(document.getElementById('vrev').value);
+  v.notes=document.getElementById('vnotes').value.trim();
+  cloudSave();closeOverlay();renderVehicules();
+  showToast('Véhicule '+v.nom+' enregistré','success');
+}
+function deleteVehicule(i){
+  if(!confirm('Supprimer le véhicule '+VEHICULES[i].nom+' ?'))return;
+  VEHICULES.splice(i,1);cloudSave();renderVehicules();
+}
+
+// ── SAUVEGARDE JSON ───────────────────────────────────────────
+function exportBackupJSON(){
+  const data=JSON.stringify(serialise(),null,2);
+  const a=document.createElement('a');
+  a.href='data:application/json;charset=utf-8,'+encodeURIComponent(data);
+  a.download='sauvegarde_cis_ruoms_'+new Date().toISOString().split('T')[0]+'.json';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  showToast('Sauvegarde téléchargée','success');
+}
+function importBackupJSON(input){
+  const file=input.files[0];if(!file)return;
+  if(!confirm('Restaurer cette sauvegarde ?\nToutes les données actuelles seront REMPLACÉES.'))
+    {input.value='';return;}
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const obj=JSON.parse(e.target.result);
+      deserialise(obj);
+      cloudSave();
+      view=DATA.slice();applyFilters();updateStats();renderBadges();
+      closeSettings();
+      showToast('Sauvegarde restaurée avec succès','success');
+    }catch(err){showToast('Fichier invalide : '+err.message,'error');}
+    input.value='';
+  };
+  reader.readAsText(file);
+}
+
+// ── IMPORT CSV ────────────────────────────────────────────────
+function importCSV(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      let txt=e.target.result.replace(/^\uFEFF/,'');
+      const lines=txt.split(/\r?\n/).filter(l=>l.trim());
+      const sep=lines[0].includes(';')?';':',';
+      const header=lines[0].split(sep).map(h=>h.replace(/"/g,'').trim().toLowerCase());
+      const iNom=header.findIndex(h=>h.includes('nom')&&!h.includes('pré')&&!h.includes('pre'));
+      const iPrenom=header.findIndex(h=>h.includes('pré')||h.includes('prenom'));
+      const iGrade=header.findIndex(h=>h.includes('grade'));
+      const iStatut=header.findIndex(h=>h.includes('statut'));
+      if(iNom===-1||iPrenom===-1){showToast('CSV invalide : colonnes Nom et Prénom requises','error');input.value='';return;}
+      let added=0,skipped=0;
+      for(let l=1;l<lines.length;l++){
+        const cells=lines[l].split(sep).map(x=>x.replace(/^"|"$/g,'').trim());
+        const nom=(cells[iNom]||'').toUpperCase();
+        const prenom=cells[iPrenom]||'';
+        if(!nom)continue;
+        if(DATA.some(a=>a.nom===nom&&a.prenom.toLowerCase()===prenom.toLowerCase())){skipped++;continue;}
+        DATA.push({nom,prenom,grade:iGrade>=0?(cells[iGrade]||'1CL'):'1CL',statut:iStatut>=0?(cells[iStatut]||'SPV'):'SPV',naissance:'',fonctions:'',qualifs:'',sap:null,inc:null,fdf:null,cod:null,med:null,aptitude:'',tel:'',email:'',adresse:'',mat:'',contact:'',ctTel:'',permB:true,permC:false,permCE:false,bip:'',taille:'',entree_cis:'',dispo:'dispo',notes:'Importé CSV '+TODAY.toLocaleDateString('fr-FR'),historique:[]});
+        added++;
+      }
+      cloudSave();view=DATA.slice();applyFilters();updateStats();renderBadges();
+      showToast(added+' agent(s) importé(s), '+skipped+' doublon(s) ignoré(s)','success');
+    }catch(err){showToast('Erreur import : '+err.message,'error');}
+    input.value='';
+  };
+  reader.readAsText(file,'utf-8');
+}
+
+// ── RECHERCHE GLOBALE (Ctrl+K ou Cmd+K) ──────────────────────
+function openQuickSearch(){
+  let qs=document.getElementById('quickSearch');
+  if(!qs){
+    qs=document.createElement('div');
+    qs.id='quickSearch';
+    qs.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;display:flex;align-items:flex-start;justify-content:center;padding-top:12vh';
+    qs.innerHTML='<div style="background:#fff;border-radius:12px;width:480px;max-width:92%;overflow:hidden;box-shadow:0 12px 48px rgba(0,0,0,.3)">'+
+      '<input id="qsInput" placeholder="🔍 Rechercher un agent… (Échap pour fermer)" style="width:100%;padding:16px 20px;border:none;font-size:16px;outline:none;border-bottom:1px solid #eee">'+
+      '<div id="qsResults" style="max-height:340px;overflow-y:auto"></div></div>';
+    qs.onclick=e=>{if(e.target===qs)closeQuickSearch();};
+    document.body.appendChild(qs);
+    document.getElementById('qsInput').addEventListener('input',renderQuickSearch);
+  }
+  qs.style.display='flex';
+  document.getElementById('qsInput').value='';
+  document.getElementById('qsResults').innerHTML='';
+  setTimeout(()=>document.getElementById('qsInput').focus(),50);
+}
+function closeQuickSearch(){const qs=document.getElementById('quickSearch');if(qs)qs.style.display='none';}
+function renderQuickSearch(){
+  const q=document.getElementById('qsInput').value.toLowerCase().trim();
+  const res=document.getElementById('qsResults');
+  if(!q){res.innerHTML='';return;}
+  const matches=DATA.map((a,i)=>({a,i})).filter(({a})=>(a.nom+' '+a.prenom).toLowerCase().includes(q)||(a.fonctions||'').toLowerCase().includes(q)).slice(0,8);
+  res.innerHTML=matches.map(({a,i})=>'<div onclick="closeQuickSearch();openAgent('+i+')" style="padding:12px 20px;cursor:pointer;display:flex;align-items:center;gap:12px;border-bottom:1px solid #f5f5f0" onmouseover="this.style.background=\'#fdf8f6\'" onmouseout="this.style.background=\'#fff\'">'+
+    '<div style="width:32px;height:32px;border-radius:50%;background:'+avatarColor(a.nom)+';display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700">'+inits(a)+'</div>'+
+    '<div><div style="font-weight:700;font-size:13px">'+a.nom+' '+a.prenom+'</div><div style="font-size:11px;color:#999">'+a.grade+(a.fonctions?' · '+a.fonctions:'')+'</div></div></div>').join('')
+    ||'<div style="padding:16px 20px;color:#aaa;font-size:13px">Aucun résultat</div>';
+}
+document.addEventListener('keydown',e=>{
+  if((e.metaKey||e.ctrlKey)&&e.key==='k'){e.preventDefault();openQuickSearch();}
+  if(e.key==='Escape')closeQuickSearch();
+});
+
+// ── FICHE AGENT IMPRIMABLE ────────────────────────────────────
+function printFiche(i){
+  const a=DATA[i],t=getTeam(a);
+  const w=window.open('','_blank');
+  function frow(l,v){return '<tr><td style="padding:5px 12px;color:#888;font-size:11px;width:180px;border-bottom:1px solid #eee">'+l+'</td><td style="padding:5px 12px;font-weight:600;font-size:13px;border-bottom:1px solid #eee">'+(v||'—')+'</td></tr>';}
+  function fdate(label,d,seuil){
+    const next=nextEcheance(d,seuil);
+    return frow(label,d?fmt(d)+(next?' → prochain : '+fmt(next):''):'—');
+  }
+  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fiche — '+a.nom+' '+a.prenom+'</title></head>'+
+  '<body style="font-family:system-ui,sans-serif;padding:30px;color:#1a1a1a;max-width:700px;margin:0 auto">'+
+  '<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #cc3300;padding-bottom:12px;margin-bottom:20px">'+
+  '<div><h1 style="margin:0;font-size:20px">'+a.nom+' '+a.prenom+'</h1><p style="margin:4px 0 0;color:#888;font-size:12px">'+a.grade+' — '+a.statut+(t?' — Équipe '+t:'')+'</p></div>'+
+  '<div style="text-align:right;font-size:11px;color:#888">CIS Ruoms — SDIS 07<br>Fiche éditée le '+TODAY.toLocaleDateString('fr-FR')+'</div></div>'+
+  '<h3 style="color:#cc3300;font-size:13px;text-transform:uppercase">Identité & coordonnées</h3><table style="width:100%;border-collapse:collapse">'+
+  frow('Date de naissance',a.naissance)+frow('Entrée au CIS',a.entree_cis)+frow('Matricule',a.mat)+frow('Téléphone',a.tel)+frow('Email',a.email)+frow('Adresse',a.adresse)+'</table>'+
+  '<h3 style="color:#cc3300;font-size:13px;text-transform:uppercase;margin-top:20px">Missions & qualifications</h3><table style="width:100%;border-collapse:collapse">'+
+  frow('Fonctions',a.fonctions)+frow('Qualifications',a.qualifs)+frow('BIP',a.bip)+frow('Taille EPI',a.taille)+
+  frow('Permis','B: '+(a.permB?'OUI':'NON')+' · C: '+(a.permC?'OUI':'NON')+' · CE: '+(a.permCE?'OUI':'NON'))+'</table>'+
+  '<h3 style="color:#cc3300;font-size:13px;text-transform:uppercase;margin-top:20px">Formations & aptitude</h3><table style="width:100%;border-collapse:collapse">'+
+  fdate('Recyclage SAP',a.sap,SEUILS.sap)+fdate('Recyclage INC',a.inc,SEUILS.inc)+fdate('FDF',a.fdf,SEUILS.fdf)+fdate('Visite médicale',a.med,SEUILS.med)+frow('Aptitude',a.aptitude)+'</table>'+
+  (a.contact?'<h3 style="color:#cc3300;font-size:13px;text-transform:uppercase;margin-top:20px">Contact d\'urgence</h3><table style="width:100%;border-collapse:collapse">'+frow('Personne',a.contact)+frow('Téléphone',a.ctTel)+'</table>':'')+
+  (a.notes?'<h3 style="color:#cc3300;font-size:13px;text-transform:uppercase;margin-top:20px">Notes</h3><p style="font-size:13px;background:#f9f9f7;padding:12px;border-radius:6px">'+a.notes+'</p>':'')+
+  '<script>window.onload=()=>window.print();<\/script></body></html>');
+  w.document.close();
+}
 
 // ── PIN ───────────────────────────────────────────────────────
 const PIN_CODE = '0712'; // ← Changez ce code PIN ici
