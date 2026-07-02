@@ -1385,7 +1385,7 @@ async function cloudSave(){
 }
 async function cloudLoad(){
   // Si le lien contient #bin=xxx (lien de partage), on l'utilise et on le mémorise
-  const hashMatch=location.hash.match(/bin=([a-f0-9]+)/i);
+  const hashMatch=location.hash.match(/bin=([A-Za-z0-9]+)/);
   if(hashMatch){
     localStorage.setItem(JSONBIN_ID_KEY,hashMatch[1]);
     // Nettoyer l'URL pour ne pas laisser le bin ID visible
@@ -1585,13 +1585,32 @@ function deleteVehicule(i){
 
 // ── LIEN DE PARTAGE ───────────────────────────────────────────
 function copyShareLink(){
-  if(!BIN_ID){showToast('Faites d\'abord une modification pour créer la base de données','error');return;}
-  const link=location.origin+location.pathname+'#bin='+BIN_ID;
-  navigator.clipboard.writeText(link).then(()=>{
-    showToast('Lien copié ! Envoyez-le à votre adjoint 📋','success');
-  }).catch(()=>{
-    prompt('Copiez ce lien et envoyez-le à votre adjoint :',link);
-  });
+  if(!BIN_ID){showToast('Faites d\'abord une modification (ex : ouvrir/enregistrer une fiche) pour créer la base','error');return;}
+  // Construire le lien à partir de l'URL actuelle sans le hash
+  let base=location.href.split('#')[0];
+  // Si on est en local (fichier téléchargé), utiliser le lien GitHub public
+  if(location.protocol==='file:'){
+    base='https://couturieuxolivier-cell.github.io/cis-ruoms-personnel/';
+  }
+  const link=base+'#bin='+BIN_ID;
+  // Afficher le lien dans une fenêtre visible
+  let html='<div class="drawer-hdr"><h2>🔗 Lien de partage</h2><button class="x-btn" onclick="closeOverlay()">×</button></div>';
+  html+='<p style="font-size:13px;color:#555;margin-bottom:12px">Envoyez ce lien à votre adjoint (avec le code PIN transmis séparément). En l\'ouvrant, il accèdera aux mêmes données que vous.</p>';
+  html+='<input id="shareLinkInput" readonly value="'+link+'" style="width:100%;padding:10px;border:2px solid #cc3300;border-radius:6px;font-size:12px;font-family:monospace" onclick="this.select()">';
+  html+='<div class="btn-row"><button class="btn btn-primary" onclick="doCopyShareLink()">📋 Copier le lien</button><button class="btn" onclick="closeOverlay()">Fermer</button></div>';
+  document.getElementById('drawer').innerHTML=html;
+  document.getElementById('overlay').classList.add('open');
+  closeSettings();
+}
+function doCopyShareLink(){
+  const input=document.getElementById('shareLinkInput');
+  input.select();input.setSelectionRange(0,99999);
+  try{
+    document.execCommand('copy');
+    showToast('Lien copié ! 📋','success');
+  }catch(e){
+    navigator.clipboard.writeText(input.value).then(()=>showToast('Lien copié ! 📋','success')).catch(()=>showToast('Sélectionnez le lien et copiez avec Cmd+C','error'));
+  }
 }
 
 // ── SAUVEGARDE JSON ───────────────────────────────────────────
