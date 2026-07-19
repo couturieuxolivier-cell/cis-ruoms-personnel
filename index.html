@@ -1184,11 +1184,13 @@ function downloadCSV(filename,cols,rows){
   const BOM='\uFEFF';
   const esc=v=>'"'+(v||'').toString().replace(/"/g,'""')+'"';
   const csv=BOM+[cols,...rows].map(r=>r.map(esc).join(';')).join('\n');
-  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const blob=new Blob([csv],{type:'application/octet-stream'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');a.href=url;
-  a.download=filename;document.body.appendChild(a);a.click();document.body.removeChild(a);
-  setTimeout(()=>URL.revokeObjectURL(url),2000);
+  a.download=filename;a.style.display='none';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},60000);
 }
 
 // ── Fiche agent ───────────────────────────────────────────────
@@ -1695,13 +1697,16 @@ function printGardes(){
 // ── SAUVEGARDE JSON ───────────────────────────────────────────
 function exportBackupJSON(){
   const data=JSON.stringify(serialise(),null,2);
-  const blob=new Blob([data],{type:'application/json'});
+  const blob=new Blob([data],{type:'application/octet-stream'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
   a.href=url;
   a.download='sauvegarde_cis_ruoms_'+new Date().toISOString().split('T')[0]+'.json';
-  document.body.appendChild(a);a.click();document.body.removeChild(a);
-  setTimeout(()=>URL.revokeObjectURL(url),2000);
+  a.style.display='none';
+  document.body.appendChild(a);
+  a.click();
+  // Ne pas révoquer immédiatement : Safari a besoin de temps (bug WebKitBlobResource)
+  setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},60000);
   showToast('Sauvegarde téléchargée dans vos Téléchargements 💾','success');
 }
 function importBackupJSON(input){
