@@ -299,6 +299,7 @@ tbody tr.row-alert td:first-child{border-left:3px solid #cc3300}
   <span class="hbadge notif-btn" id="notifBell" onclick="toggleNotifRequest()" title="Notifications navigateur">
     🔔 <span id="notifCount">0</span>
   </span>
+  <span class="hbadge notif-btn" onclick="exportBackupJSON()" title="Télécharger une sauvegarde">💾</span>
   <span class="hbadge notif-btn" onclick="openSettings()" title="Paramètres">⚙️</span>
   <span class="hbadge" id="syncStatus">⟳ Chargement…</span>
 </header>
@@ -401,6 +402,10 @@ tbody tr.row-alert td:first-child{border-left:3px solid #cc3300}
 
   <!-- ÉQUIPES -->
   <div id="panel-equipes" class="panel">
+    <div class="toolbar">
+      <button class="btn" onclick="printEquipes()">🖨 Imprimer les équipes</button>
+      <button class="btn" onclick="exportBackupJSON()">💾 Sauvegarde rapide</button>
+    </div>
     <div class="team-grid" id="tgrid"></div>
   </div>
 
@@ -432,6 +437,7 @@ tbody tr.row-alert td:first-child{border-left:3px solid #cc3300}
   <div id="panel-gardes" class="panel">
     <div class="rappel-toolbar">
       <div class="rappel-toolbar-title">🗓 Planning des gardes week-end (12 prochaines semaines)</div>
+      <button class="btn btn-sm" onclick="printGardes()">🖨 Imprimer</button>
       <button class="btn btn-sm" onclick="exportGardesCSV()">📤 Export CSV</button>
     </div>
     <div id="gardesContent"></div>
@@ -1611,6 +1617,76 @@ function doCopyShareLink(){
   }catch(e){
     navigator.clipboard.writeText(input.value).then(()=>showToast('Lien copié ! 📋','success')).catch(()=>showToast('Sélectionnez le lien et copiez avec Cmd+C','error'));
   }
+}
+
+// ── IMPRESSION ÉQUIPES ────────────────────────────────────────
+function printEquipes(){
+  const w=window.open('','_blank');
+  let body='';
+  const thColors={1:'#0a5a35',2:'#3a2a9a',3:'#7a4500',4:'#8a2020'};
+  for(let t=1;t<=4;t++){
+    const members=DATA.filter(a=>getTeam(a)===t);
+    if(!members.length)continue;
+    const dispo=members.filter(a=>a.dispo==='dispo').length;
+    body+='<div style="margin-bottom:24px;break-inside:avoid">'+
+    '<h2 style="color:'+thColors[t]+';font-size:15px;border-bottom:2px solid '+thColors[t]+';padding-bottom:5px;margin-bottom:8px">Équipe '+t+' <span style="font-weight:400;font-size:12px;color:#888">('+dispo+'/'+members.length+' disponibles)</span></h2>'+
+    '<table style="width:100%;border-collapse:collapse;font-size:12px">'+
+    '<tr style="background:#f5f5f0"><th style="text-align:left;padding:6px 10px;font-size:10px;color:#888">NOM</th><th style="text-align:left;padding:6px 10px;font-size:10px;color:#888">PRÉNOM</th><th style="text-align:left;padding:6px 10px;font-size:10px;color:#888">GRADE</th><th style="text-align:left;padding:6px 10px;font-size:10px;color:#888">DISPO</th><th style="text-align:left;padding:6px 10px;font-size:10px;color:#888">TÉLÉPHONE</th><th style="text-align:left;padding:6px 10px;font-size:10px;color:#888">FONCTIONS</th></tr>'+
+    members.map(m=>'<tr style="border-bottom:1px solid #eee">'+
+      '<td style="padding:6px 10px;font-weight:700">'+m.nom+'</td>'+
+      '<td style="padding:6px 10px">'+m.prenom+'</td>'+
+      '<td style="padding:6px 10px">'+m.grade+'</td>'+
+      '<td style="padding:6px 10px;color:'+(m.dispo==='dispo'?'#1a7a3a':'#cc3300')+';font-weight:600">'+({dispo:'Disponible',conge:'Congé',indispo:'Indisponible',suspendu:'Suspendu'}[m.dispo]||m.dispo)+'</td>'+
+      '<td style="padding:6px 10px">'+(m.tel||'—')+'</td>'+
+      '<td style="padding:6px 10px;color:#666">'+(m.fonctions||'—')+'</td>'+
+    '</tr>').join('')+'</table></div>';
+  }
+  const nc=DATA.filter(a=>getTeam(a)===0);
+  if(nc.length){
+    body+='<div style="break-inside:avoid"><h2 style="color:#666;font-size:15px;border-bottom:2px solid #ccc;padding-bottom:5px;margin-bottom:8px">Non affectés ('+nc.length+')</h2>'+
+    '<p style="font-size:12px">'+nc.map(m=>m.nom+' '+m.prenom[0]+'. ('+m.grade+')').join(' · ')+'</p></div>';
+  }
+  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Équipes de garde — CIS Ruoms</title></head>'+
+  '<body style="font-family:system-ui,sans-serif;padding:25px;color:#1a1a1a;max-width:800px;margin:0 auto">'+
+  '<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #cc3300;padding-bottom:10px;margin-bottom:20px">'+
+  '<h1 style="margin:0;font-size:18px">🔥 Équipes de garde — CIS Ruoms</h1>'+
+  '<div style="font-size:11px;color:#888;text-align:right">SDIS 07<br>Édité le '+TODAY.toLocaleDateString('fr-FR')+'</div></div>'+
+  body+
+  '<script>window.onload=()=>window.print();<\/script></body></html>');
+  w.document.close();
+}
+
+// ── IMPRESSION PLANNING GARDES ────────────────────────────────
+function printGardes(){
+  const w=window.open('','_blank');
+  const weekends=getWeekends(12);
+  let rows='';
+  weekends.forEach(we=>{
+    const key=weekendKey(we);
+    const p=PLANNING[key]||{eq:0,notes:''};
+    const dim=new Date(we);dim.setDate(dim.getDate()+1);
+    const label=we.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'})+' – '+dim.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});
+    let membres='—';
+    if(p.eq>0){
+      const team=DATA.filter(a=>getTeam(a)===p.eq&&a.dispo==='dispo');
+      membres=team.map(m=>m.nom+' '+m.prenom[0]+'.').join(', ')||'Aucun disponible !';
+    }
+    rows+='<tr style="border-bottom:1px solid #eee">'+
+      '<td style="padding:8px 10px;font-weight:700;white-space:nowrap">'+label+'</td>'+
+      '<td style="padding:8px 10px;font-weight:700;color:#cc3300">'+(p.eq?'Équipe '+p.eq:'—')+'</td>'+
+      '<td style="padding:8px 10px;font-size:11px">'+membres+'</td>'+
+      '<td style="padding:8px 10px;font-size:11px;color:#666">'+(p.notes||'')+'</td></tr>';
+  });
+  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Planning gardes — CIS Ruoms</title></head>'+
+  '<body style="font-family:system-ui,sans-serif;padding:25px;color:#1a1a1a;max-width:800px;margin:0 auto">'+
+  '<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #cc3300;padding-bottom:10px;margin-bottom:20px">'+
+  '<h1 style="margin:0;font-size:18px">🗓 Planning des gardes week-end — CIS Ruoms</h1>'+
+  '<div style="font-size:11px;color:#888;text-align:right">SDIS 07<br>Édité le '+TODAY.toLocaleDateString('fr-FR')+'</div></div>'+
+  '<table style="width:100%;border-collapse:collapse;font-size:13px">'+
+  '<tr style="background:#f5f5f0"><th style="text-align:left;padding:8px 10px;font-size:10px;color:#888">WEEK-END</th><th style="text-align:left;padding:8px 10px;font-size:10px;color:#888">ÉQUIPE</th><th style="text-align:left;padding:8px 10px;font-size:10px;color:#888">AGENTS DISPONIBLES</th><th style="text-align:left;padding:8px 10px;font-size:10px;color:#888">NOTES</th></tr>'+
+  rows+'</table>'+
+  '<script>window.onload=()=>window.print();<\/script></body></html>');
+  w.document.close();
 }
 
 // ── SAUVEGARDE JSON ───────────────────────────────────────────
