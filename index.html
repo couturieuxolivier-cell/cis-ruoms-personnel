@@ -296,6 +296,7 @@ tbody tr.row-alert td:first-child{border-left:3px solid #cc3300}
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2c0 6-8 8-8 14a8 8 0 0 0 16 0C20 10 12 8 12 2z"/></svg>
   <h1>CIS Ruoms — Gestion du Personnel</h1>
   <span class="hbadge">SDIS 07</span>
+  <span class="hbadge" style="opacity:.7" title="Version de l'application">v2.5</span>
   <span class="hbadge notif-btn" id="notifBell" onclick="toggleNotifRequest()" title="Notifications navigateur">
     🔔 <span id="notifCount">0</span>
   </span>
@@ -395,6 +396,7 @@ tbody tr.row-alert td:first-child{border-left:3px solid #cc3300}
       <span class="notif-status" id="notifStatusBadge">—</span>
       <button class="btn btn-sm" id="notifToggleBtn" onclick="toggleNotifRequest()">Activer les notifications</button>
       <button class="btn btn-sm" onclick="exportRappelsCSV()">📤 Exporter les rappels</button>
+      <button class="btn btn-sm" onclick="exportICS()">📅 Exporter vers Calendrier</button>
       <button class="btn btn-sm btn-primary" onclick="sendBulkEmail()">📧 Email groupé</button>
     </div>
     <div id="rappelContent"></div>
@@ -1184,13 +1186,7 @@ function downloadCSV(filename,cols,rows){
   const BOM='\uFEFF';
   const esc=v=>'"'+(v||'').toString().replace(/"/g,'""')+'"';
   const csv=BOM+[cols,...rows].map(r=>r.map(esc).join(';')).join('\n');
-  const blob=new Blob([csv],{type:'application/octet-stream'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');a.href=url;
-  a.download=filename;a.style.display='none';
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},60000);
+  triggerDownload(new Blob([csv],{type:'application/octet-stream'}),filename);
 }
 
 // ── Fiche agent ───────────────────────────────────────────────
@@ -1694,20 +1690,124 @@ function printGardes(){
   w.document.close();
 }
 
+// ── EXPORT CALENDRIER (.ics) ──────────────────────────────────
+function icsDate(d){
+  // Format AAAAMMJJ pour événement journée entière
+  const dt=toDate(d);
+  return dt.getFullYear()+String(dt.getMonth()+1).padStart(2,'0')+String(dt.getDate()).padStart(2,'0');
+}
+function icsEscape(s){return (s||'').replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\n/g,'\\n');}
+
+function exportICS(){
+  const events=[];
+  const yearNow=TODAY.getFullYear();
+
+  // 1. Échéances formations & visites médicales (12 prochains mois)
+  getAllDeadlines(365).forEach(d=>{
+    if(d.days<0)return; // pas les échues
+    events.push({
+      date:d.nextDate,
+      title:'🚒 '+d.type+' — '+d.agent.nom+' '+d.agent.prenom,
+      desc:'CIS Ruoms : échéance '+d.type.toLowerCase()+' pour '+d.agent.nom+' '+d.agent.prenom+(d.agent.tel?' ('+d.agent.tel+')':''),
+      alarmDays:1 // rappel la veille
+    });
+  });
+
+  // 2. Anniversaires (année en cours + suivante)
+  DATA.forEach(a=>{
+    if(!a.naissance)return;
+    const p=a.naissance.split('/');
+    if(p.length!==3)return;
+    [yearNow,yearNow+1].forEach(y=>{
+      const d=new Date(y,+p[1]-1,+p[0]);
+      if(d<TODAY)return;
+      const age=y-(+p[2]);
+      events.push({
+        date:d,
+        title:'🎂 Anniversaire — '+a.nom+' '+a.prenom+' ('+age+' ans)',
+        desc:'CIS Ruoms : '+a.prenom+' fête ses '+age+' ans aujourd\'hui !',
+        alarmDays:0 // rappel le jour même au matin
+      });
+    });
+  });
+
+  // 3. Anniversaires d'engagement (multiples de 5 ans)
+  DATA.forEach(a=>{
+    if(!a.entree_cis)return;
+    const p=a.entree_cis.split('/');
+    if(p.length!==3)return;
+    [yearNow,yearNow+1].forEach(y=>{
+      const years=y-(+p[2]);
+      if(years<=0||years%5!==0)return;
+      const d=new Date(y,+p[1]-1,+p[0]);
+      if(d<TODAY)return;
+      events.push({
+        date:d,
+        title:'🎖 '+years+' ans d\'engagement — '+a.nom+' '+a.prenom,
+        desc:'CIS Ruoms : '+a.nom+' '+a.prenom+' atteint '+years+' ans d\'engagement. Penser au renouvellement / félicitations.',
+        alarmDays:7 // rappel une semaine avant
+      });
+    });
+  });
+
+  // 4. Contrôles techniques véhicules
+  VEHICULES.forEach(v=>{
+    [['ct','Contrôle technique'],['revision','Révision']].forEach(([key,label])=>{
+      if(!v[key])return;
+      const d=toDate(v[key]);
+      if(d<TODAY)return;
+      events.push({
+        date:d,
+        title:'🔧 '+label+' — '+v.nom,
+        desc:'CIS Ruoms : '+label.toLowerCase()+' du véhicule '+v.nom+(v.immat?' ('+v.immat+')':''),
+        alarmDays:14 // 2 semaines avant
+      });
+    });
+  });
+
+  if(!events.length){showToast('Aucun événement à exporter','error');return;}
+
+  // Génération du fichier ICS
+  let ics='BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//CIS Ruoms//Gestion Personnel//FR\r\nCALSCALE:GREGORIAN\r\nX-WR-CALNAME:CIS Ruoms\r\n';
+  const stamp=icsDate(TODAY)+'T000000Z';
+  events.forEach((e,idx)=>{
+    const dEnd=new Date(toDate(e.date));dEnd.setDate(dEnd.getDate()+1);
+    ics+='BEGIN:VEVENT\r\n';
+    ics+='UID:cisruoms-'+idx+'-'+icsDate(e.date)+'@cis-ruoms\r\n';
+    ics+='DTSTAMP:'+stamp+'\r\n';
+    ics+='DTSTART;VALUE=DATE:'+icsDate(e.date)+'\r\n';
+    ics+='DTEND;VALUE=DATE:'+icsDate(dEnd)+'\r\n';
+    ics+='SUMMARY:'+icsEscape(e.title)+'\r\n';
+    ics+='DESCRIPTION:'+icsEscape(e.desc)+'\r\n';
+    // Alarme : rappel à 8h du matin, X jours avant
+    ics+='BEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:'+icsEscape(e.title)+'\r\n';
+    if(e.alarmDays>0)ics+='TRIGGER:-P'+e.alarmDays+'DT16H\r\n'; // veille à 8h = -1j16h avant minuit
+    else ics+='TRIGGER:PT8H\r\n'; // jour même à 8h
+    ics+='END:VALARM\r\n';
+    ics+='END:VEVENT\r\n';
+  });
+  ics+='END:VCALENDAR\r\n';
+
+  triggerDownload(new Blob([ics],{type:'text/calendar;charset=utf-8'}),'calendrier_cis_ruoms.ics');
+  showToast(events.length+' événements exportés ! Ouvrez le fichier pour les ajouter à votre calendrier 📅','success');
+}
+
 // ── SAUVEGARDE JSON ───────────────────────────────────────────
-function exportBackupJSON(){
-  const data=JSON.stringify(serialise(),null,2);
-  const blob=new Blob([data],{type:'application/octet-stream'});
+function triggerDownload(blob,filename){
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
   a.href=url;
-  a.download='sauvegarde_cis_ruoms_'+new Date().toISOString().split('T')[0]+'.json';
+  a.download=filename;
   a.style.display='none';
   document.body.appendChild(a);
-  a.click();
-  // Ne pas révoquer immédiatement : Safari a besoin de temps (bug WebKitBlobResource)
+  // dispatchEvent est plus fiable que .click() sur Safari
+  a.dispatchEvent(new MouseEvent('click',{view:window,bubbles:true,cancelable:true}));
   setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},60000);
-  showToast('Sauvegarde téléchargée dans vos Téléchargements 💾','success');
+}
+function exportBackupJSON(){
+  const data=JSON.stringify(serialise(),null,2);
+  triggerDownload(new Blob([data],{type:'application/octet-stream'}),'sauvegarde_cis_ruoms_'+new Date().toISOString().split('T')[0]+'.json');
+  showToast('Sauvegarde téléchargée 💾 (vérifiez vos Téléchargements)','success');
 }
 function importBackupJSON(input){
   const file=input.files[0];if(!file)return;
