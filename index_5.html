@@ -257,6 +257,34 @@ tbody tr.row-alert td:first-child{border-left:3px solid #cc3300}
   .rappel-countdown{min-width:auto}
   .pin-box{width:290px;padding:2rem 1.5rem}
 }
+
+/* ── MODE SOMBRE ── */
+body.dark{background:#1a1a1e;color:#e8e8e4}
+body.dark .stat,body.dark table,body.dark .team-card,body.dark .alert-row,body.dark .rappel-card,body.dark .dash-card,body.dark .rappel-toolbar,body.dark .cal-day,body.dark .drawer,body.dark .settings-panel,body.dark .pin-box{background:#26262c;border-color:#3a3a42;color:#e8e8e4}
+body.dark thead{background:#2e2e35}
+body.dark th{color:#aaa;border-color:#3a3a42}
+body.dark th:hover{background:#35353d;color:#ddd}
+body.dark td{border-color:#32323a}
+body.dark tbody tr:hover{background:#2e2a28}
+body.dark .toolbar input,body.dark .toolbar select,body.dark .edit-form input,body.dark .edit-form select,body.dark .edit-form textarea{background:#2e2e35;border-color:#45454e;color:#e8e8e4}
+body.dark .btn{background:#2e2e35;border-color:#45454e;color:#e8e8e4}
+body.dark .btn:hover{background:#3a3a42}
+body.dark .btn-primary{background:#cc3300;border-color:#cc3300;color:#fff}
+body.dark .form-section,body.dark .fc,body.dark .hist-item{background:#2e2e35;border-color:#3a3a42}
+body.dark .stat-lbl,body.dark .ir-lbl,body.dark .tm-grade,body.dark .fc-date{color:#888}
+body.dark .ir-val,body.dark .fc-name{color:#e8e8e4}
+body.dark .muted{color:#666}
+body.dark .cal-day.other-month{background:#202024}
+body.dark .tab{color:#999}
+body.dark .tab.active{color:#ff6640}
+body.dark .tab:hover:not(.active){color:#ccc}
+body.dark .tabs{border-color:#3a3a42}
+body.dark .tm{border-color:#32323a}
+body.dark .tm:hover{background:#2e2a28}
+body.dark .rappel-empty{background:#26262c;border-color:#45454e;color:#888}
+body.dark .sec-lbl{border-color:#32323a}
+body.dark .dash-compliance{background:#2e2e35;border-color:#3a3a42}
+body.dark .compliance-bar-bg,body.dark .dash-bar-wrap{background:#3a3a42}
 </style>
 </head>
 <body>
@@ -296,10 +324,11 @@ tbody tr.row-alert td:first-child{border-left:3px solid #cc3300}
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2c0 6-8 8-8 14a8 8 0 0 0 16 0C20 10 12 8 12 2z"/></svg>
   <h1>CIS Ruoms — Gestion du Personnel</h1>
   <span class="hbadge">SDIS 07</span>
-  <span class="hbadge" style="opacity:.7" title="Version de l'application">v2.6</span>
+  <span class="hbadge" style="opacity:.7" title="Version de l'application">v2.7</span>
   <span class="hbadge notif-btn" id="notifBell" onclick="toggleNotifRequest()" title="Notifications navigateur">
     🔔 <span id="notifCount">0</span>
   </span>
+  <span class="hbadge notif-btn" onclick="toggleDarkMode()" title="Mode sombre / clair" id="darkToggle">🌙</span>
   <span class="hbadge notif-btn" onclick="exportBackupJSON()" title="Télécharger une sauvegarde">💾</span>
   <span class="hbadge notif-btn" onclick="openSettings()" title="Paramètres">⚙️</span>
   <span class="hbadge" id="syncStatus">⟳ Chargement…</span>
@@ -357,6 +386,9 @@ tbody tr.row-alert td:first-child{border-left:3px solid #cc3300}
         <option value="indispo">Indisponible</option>
         <option value="suspendu">Suspendu</option>
       </select>
+      <select id="fqualif" onchange="applyFilters()">
+        <option value="">Toutes qualifications</option>
+      </select>
       <select id="fecheance" onchange="applyFilters()">
         <option value="">Toutes échéances</option>
         <option value="tomorrow">Demain</option>
@@ -406,6 +438,7 @@ tbody tr.row-alert td:first-child{border-left:3px solid #cc3300}
   <div id="panel-equipes" class="panel">
     <div class="toolbar">
       <button class="btn" onclick="printEquipes()">🖨 Imprimer les équipes</button>
+      <button class="btn" onclick="printTrombinoscope()">👥 Trombinoscope</button>
       <button class="btn" onclick="exportBackupJSON()">💾 Sauvegarde rapide</button>
     </div>
     <div class="team-grid" id="tgrid"></div>
@@ -486,6 +519,10 @@ tbody tr.row-alert td:first-child{border-left:3px solid #cc3300}
       <p style="font-size:11px;color:#aaa;margin-top:5px">Utilisé comme expéditeur dans les emails de rappel générés.</p>
     </div>
     <div class="form-section">
+      <div class="form-section-title">Objectif FMPA annuel (heures)</div>
+      <input type="number" id="s-fmpa" min="0" max="200" value="40" style="width:120px;padding:7px 9px;border:1px solid #ddd;border-radius:5px;font-size:13px">
+    </div>
+    <div class="form-section">
       <div class="form-section-title">Fenêtre de rappel (jours avant l'échéance)</div>
       <input type="number" id="s-window" min="1" max="90" value="30" style="width:120px;padding:7px 9px;border:1px solid #ddd;border-radius:5px;font-size:13px">
       <p style="font-size:11px;color:#aaa;margin-top:5px">Les rappels s'affichent X jours avant l'échéance.</p>
@@ -539,6 +576,7 @@ function saveSettings(){
   SETTINGS.seuils.fdf = +document.getElementById('s-fdf').value||36;
   SETTINGS.emailCentre = document.getElementById('s-email').value.trim();
   SETTINGS.reminderWindow = +document.getElementById('s-window').value||30;
+  SETTINGS.fmpaObjectif = +document.getElementById('s-fmpa').value||40;
   SEUILS = SETTINGS.seuils;
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(SETTINGS));
   closeSettings();
@@ -552,6 +590,7 @@ function openSettings(){
   document.getElementById('s-fdf').value=SEUILS.fdf;
   document.getElementById('s-email').value=SETTINGS.emailCentre||'';
   document.getElementById('s-window').value=SETTINGS.reminderWindow||30;
+  document.getElementById('s-fmpa').value=SETTINGS.fmpaObjectif||40;
   document.getElementById('settingsOverlay').classList.add('open');
 }
 function closeSettings(){document.getElementById('settingsOverlay').classList.remove('open');}
@@ -735,17 +774,32 @@ function agentHasUpcoming(a, category){
     return days!==null&&days>=0&&days<=maxDays;
   });
 }
+function populateQualifFilter(){
+  const sel=document.getElementById('fqualif');if(!sel)return;
+  const current=sel.value;
+  const tokens=new Set();
+  DATA.forEach(a=>{
+    (a.qualifs||'').split(/[,;\-\/]/).forEach(t=>{
+      t=t.trim().toUpperCase();
+      if(t&&t.length>=2&&!t.includes('À FAIRE')&&!t.includes('POSSIBLE'))tokens.add(t);
+    });
+  });
+  sel.innerHTML='<option value="">Toutes qualifications</option>'+
+    [...tokens].sort().map(t=>'<option value="'+t.replace(/"/g,'&quot;')+'"'+(t===current?' selected':'')+'>'+t+'</option>').join('');
+}
 function applyFilters(){
   const q=(document.getElementById('srch').value||'').toLowerCase();
   const eq=document.getElementById('feq').value;
   const st=document.getElementById('fst').value;
   const fd=document.getElementById('fdispo').value;
   const fech=document.getElementById('fecheance').value;
+  const fq=(document.getElementById('fqualif')||{}).value||'';
   view=DATA.filter(a=>{
     const t=getTeam(a);
     const mq=!q||(a.nom+' '+a.prenom).toLowerCase().includes(q)||(a.fonctions||'').toLowerCase().includes(q)||(a.qualifs||'').toLowerCase().includes(q);
     const me=!fech||agentHasUpcoming(a,fech);
-    return mq&&(!eq||(eq==='0'?t===0:t===+eq))&&(!st||a.statut===st)&&(!fd||a.dispo===fd)&&me;
+    const mqual=!fq||(a.qualifs||'').toUpperCase().includes(fq);
+    return mq&&(!eq||(eq==='0'?t===0:t===+eq))&&(!st||a.statut===st)&&(!fd||a.dispo===fd)&&me&&mqual;
   });
   // Grade order for sorting
   const GRADE_ORDER=['Ltn','ADC','ADJ','SCH','SGT','CCH','CPL','1CL','SAP','IPR','ISP'];
@@ -1084,6 +1138,29 @@ function renderDashboard(){
   '</div>'+
   '</div>'+
   '</div>'+
+  // FMPA
+  '<div class="dash-card" style="margin-top:16px">'+
+  '<div class="dash-card-title">⏱ FMPA '+TODAY.getFullYear()+' — objectif '+(SETTINGS.fmpaObjectif||40)+' h</div>'+
+  (function(){
+    const actifsF=DATA.filter(a=>a.dispo!=='suspendu'&&a.statut!=='PATS');
+    const obj=SETTINGS.fmpaObjectif||40;
+    const enRetard=actifsF.filter(a=>(a.fmpa||0)<obj).sort((x,y)=>(x.fmpa||0)-(y.fmpa||0));
+    const ok=actifsF.length-enRetard.length;
+    let s='<div style="font-size:13px;margin-bottom:10px"><span class="green" style="font-weight:700">'+ok+'</span> objectif atteint · <span class="orange" style="font-weight:700">'+enRetard.length+'</span> en cours</div>';
+    if(enRetard.length){
+      s+='<div style="display:flex;flex-wrap:wrap;gap:6px">'+enRetard.slice(0,15).map(a=>{
+        const h=a.fmpa||0;const pct=Math.min(100,Math.round(h/obj*100));
+        return'<div style="background:#f9f9f7;border-radius:6px;padding:5px 10px;font-size:11px"><strong>'+a.nom+' '+a.prenom[0]+'.</strong> '+h+'h <span style="color:'+(pct>=50?'#e07000':'#cc3300')+'">('+pct+'%)</span></div>';
+      }).join('')+(enRetard.length>15?'<div style="font-size:11px;color:#aaa;padding:5px">+ '+(enRetard.length-15)+' autres</div>':'')+'</div>';
+    }
+    return s;
+  })()+
+  '</div>'+
+  // Journal des modifications
+  '<div class="dash-card" style="margin-top:16px">'+
+  '<div class="dash-card-title">📖 Journal des modifications (15 dernières)</div>'+
+  (LOG.length?LOG.slice(-15).reverse().map(l=>'<div style="display:flex;gap:10px;padding:5px 0;border-bottom:1px solid #f5f5f0;font-size:12px"><span style="color:#aaa;white-space:nowrap">'+l.date+'</span><span class="pill p-grade">'+l.qui+'</span><span style="flex:1">'+l.texte+'</span></div>').join(''):'<p style="font-size:12px;color:#aaa">Aucune modification enregistrée pour le moment.</p>')+
+  '</div>'+
   // Grades
   '<div class="dash-card" style="margin-top:16px">'+
   '<div class="dash-card-title">Répartition par grade</div>'+
@@ -1238,6 +1315,11 @@ function openAgent(i){
     if(a.sap){const next=nextEcheance(a.sap,SEUILS.sap);html+='<a href="'+generateReminderEmail(a,'recyclage SAP',next)+'" class="btn btn-sm btn-email" style="text-decoration:none">📧 Rappel SAP</a>';}
     html+='</div>';
   }
+  if(a.conge_debut&&a.conge_fin)html+='<div class="sec-lbl">Congé programmé</div><p style="font-size:13px;background:#fff0dd;padding:10px;border-radius:6px;color:#8a5500">🏖 Du '+fmt(a.conge_debut)+' au '+fmt(a.conge_fin)+' — retour automatique en "Disponible" le lendemain</p>';
+  html+='<div class="sec-lbl">FMPA & EPI</div><div class="ig">';
+  html+='<div><div class="ir-lbl">FMPA '+TODAY.getFullYear()+'</div><div class="ir-val">'+(a.fmpa||0)+' h / '+(SETTINGS.fmpaObjectif||40)+' h '+((a.fmpa||0)>=(SETTINGS.fmpaObjectif||40)?'<span class="pill p-ok">✓ Objectif atteint</span>':'')+'</div></div>';
+  html+='<div><div class="ir-lbl">Perception EPI</div><div class="ir-val">'+(a.epi_percep?fmt(a.epi_percep):'—')+'</div></div>';
+  html+='</div>';
   if(a.contact)html+='<div class="sec-lbl">Contact d\'urgence</div><div class="ig"><div><div class="ir-lbl">Personne</div><div class="ir-val">'+a.contact+'</div></div><div><div class="ir-lbl">Téléphone</div><div class="ir-val">'+a.ctTel+'</div></div></div>';
   if(a.notes)html+='<div class="sec-lbl">Notes</div><p style="font-size:13px;color:#555;background:#f9f9f7;padding:10px;border-radius:6px">'+a.notes+'</p>';
   html+='<div class="sec-lbl">Historique</div>';
@@ -1288,6 +1370,12 @@ function openEdit(i){
   html+='<div class="form-section"><div class="form-section-title">Formations</div><div class="ig">';
   html+=fd2('esap','Dernier SAP',a.sap)+fd2('einc','Dernier INC',a.inc)+fd2('efdf','Dernier FDF',a.fdf)+fd2('emed','Dernière visite méd.',a.med);
   html+='</div></div>';
+  html+='<div class="form-section"><div class="form-section-title">Congé programmé (retour auto en "Disponible" à la fin)</div><div class="ig">';
+  html+=fi('ecdeb','Début congé (JJ/MM/AAAA)',a.conge_debut?fmt(a.conge_debut):'')+fi('ecfin','Fin congé (JJ/MM/AAAA)',a.conge_fin?fmt(a.conge_fin):'');
+  html+='</div></div>';
+  html+='<div class="form-section"><div class="form-section-title">FMPA & EPI</div><div class="ig">';
+  html+=fi('efmpa','Heures FMPA cette année',a.fmpa||'0')+fi('eepip','Perception EPI (JJ/MM/AAAA)',a.epi_percep?fmt(a.epi_percep):'');
+  html+='</div></div>';
   html+='<div class="form-section"><div class="form-section-title">Permis</div><div style="display:flex;gap:16px;flex-wrap:wrap">';
   html+=cb('epb','Permis B',a.permB)+cb('epc','Permis C',a.permC)+cb('epce','Permis CE',a.permCE);
   html+='</div></div>';
@@ -1325,6 +1413,16 @@ function saveEdit(i){
   a.mat=document.getElementById('emat').value.trim();
   a.bip=document.getElementById('ebip').value.trim();
   a.taille=document.getElementById('etaille').value.trim();
+  a.conge_debut=parseMyDate(document.getElementById('ecdeb').value);
+  a.conge_fin=parseMyDate(document.getElementById('ecfin').value);
+  a.fmpa=parseFloat(document.getElementById('efmpa').value)||0;
+  a.fmpa_annee=TODAY.getFullYear();
+  a.epi_percep=parseMyDate(document.getElementById('eepip').value);
+  // Si un congé couvre aujourd'hui, basculer automatiquement
+  if(a.conge_debut&&a.conge_fin){
+    const deb=toDate(a.conge_debut),fin=toDate(a.conge_fin);
+    if(TODAY>=deb&&TODAY<=fin&&a.dispo==='dispo')a.dispo='conge';
+  }
   a.contact=document.getElementById('ect').value.trim();
   a.ctTel=document.getElementById('ectl').value.trim();
   a.notes=document.getElementById('enotes').value.trim();
@@ -1335,8 +1433,9 @@ function saveEdit(i){
   markDirtyAgent(a);
   if(oldKey!==agentKey(a))DIRTY.deleted.add(oldKey); // nom/prénom corrigé
   DIRTY.teams=true;
+  addLog('Fiche modifiée : '+a.nom+' '+a.prenom);
   cloudSave();
-  view=DATA.slice();applyFilters();updateStats();renderBadges();
+  view=DATA.slice();populateQualifFilter();applyFilters();updateStats();renderBadges();
   showToast('Fiche de '+a.nom+' mise à jour','success');
   openAgent(i);
 }
@@ -1351,6 +1450,7 @@ function deleteAgent(i){
   const a=DATA[i];
   if(!confirm('Supprimer '+a.nom+' '+a.prenom+' ?\nCette action est irréversible.'))return;
   DIRTY.deleted.add(agentKey(a));DIRTY.teams=true;
+  addLog('Agent supprimé : '+a.nom+' '+a.prenom);
   const n=a.nom.toUpperCase();const np=(a.nom+' '+(a.prenom||'')[0]).toUpperCase();
   for(let t=1;t<=4;t++)TEAMS[t]=TEAMS[t].filter(x=>x!==n&&x!==np);
   DATA.splice(i,1);
@@ -1377,19 +1477,51 @@ function showTab(name){
 var BIN_ID=null;
 var needSave=false;
 function setSyncStatus(s,m){const el=document.getElementById('syncStatus');if(!el)return;el.textContent=m;el.style.background={ok:'rgba(26,122,58,.5)',saving:'rgba(224,112,0,.5)',err:'rgba(204,51,0,.5)',loading:'rgba(255,255,255,.2)'}[s]||'rgba(255,255,255,.2)';}
-function serialise(){return{data:DATA.map(a=>{const o=Object.assign({},a);o.historique=a.historique||[];return o;}),teams:TEAMS,planning:PLANNING,vehicules:VEHICULES};}
+function serialise(){return{data:DATA.map(a=>{const o=Object.assign({},a);o.historique=a.historique||[];return o;}),teams:TEAMS,planning:PLANNING,vehicules:VEHICULES,log:LOG};}
 function deserialise(obj){
   DATA=(obj.data||[]).map(a=>{if(!a.historique)a.historique=[];if(!a.dispo)a.dispo='dispo';if(!a.fdf)a.fdf=null;return a;});
   if(obj.teams)for(const k in obj.teams)TEAMS[k]=obj.teams[k];
   if(obj.planning)PLANNING=obj.planning;
   if(obj.vehicules)VEHICULES=obj.vehicules;
+  if(obj.log)LOG=obj.log;
 }
+// ── Mode sombre ───────────────────────────────────────────────
+function toggleDarkMode(){
+  const dark=document.body.classList.toggle('dark');
+  localStorage.setItem('cis_dark_mode',dark?'1':'0');
+  document.getElementById('darkToggle').textContent=dark?'☀️':'🌙';
+}
+if(localStorage.getItem('cis_dark_mode')==='1'){
+  document.body.classList.add('dark');
+  // Le bouton n'existe pas encore au moment où le script s'exécute ? Si : il est après le header
+  const dt=document.getElementById('darkToggle');
+  if(dt)dt.textContent='☀️';
+}
+
+// ── Journal des modifications ─────────────────────────────────
+var LOG=[];
+var USER_INITIALS=localStorage.getItem('cis_user_initials')||'';
+function ensureInitials(){
+  if(!USER_INITIALS){
+    const v=prompt('Vos initiales pour le journal des modifications (ex : OC) :');
+    USER_INITIALS=(v||'?').trim().toUpperCase().substring(0,4);
+    localStorage.setItem('cis_user_initials',USER_INITIALS);
+  }
+  return USER_INITIALS;
+}
+function addLog(texte){
+  ensureInitials();
+  LOG.push({date:new Date().toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}),qui:USER_INITIALS,texte:texte});
+  if(LOG.length>200)LOG=LOG.slice(-200);
+  DIRTY.log=true;
+}
+
 // ── Suivi des modifications locales (anti-écrasement) ─────────
-var DIRTY={agents:new Set(),deleted:new Set(),teams:false,planning:false,vehicules:false,full:false};
+var DIRTY={agents:new Set(),deleted:new Set(),teams:false,planning:false,vehicules:false,log:false,full:false};
 var LOADED_AT=0;
 function agentKey(a){return(a.nom+'|'+a.prenom).toUpperCase();}
 function markDirtyAgent(a){DIRTY.agents.add(agentKey(a));}
-function clearDirty(){DIRTY.agents.clear();DIRTY.deleted.clear();DIRTY.teams=false;DIRTY.planning=false;DIRTY.vehicules=false;DIRTY.full=false;}
+function clearDirty(){DIRTY.agents.clear();DIRTY.deleted.clear();DIRTY.teams=false;DIRTY.planning=false;DIRTY.vehicules=false;DIRTY.log=false;DIRTY.full=false;}
 
 async function cloudSave(){
   setSyncStatus('saving','⟳ Sauvegarde…');
@@ -1421,6 +1553,13 @@ async function cloudSave(){
         if(DIRTY.teams)base.teams=TEAMS;
         if(DIRTY.planning)base.planning=PLANNING;
         if(DIRTY.vehicules)base.vehicules=VEHICULES;
+        // Journal : fusionner les deux listes sans doublons
+        base.log=base.log||[];
+        if(DIRTY.log){
+          const seen=new Set(base.log.map(l=>l.date+'|'+l.qui+'|'+l.texte));
+          LOG.forEach(l=>{const k=l.date+'|'+l.qui+'|'+l.texte;if(!seen.has(k))base.log.push(l);});
+          if(base.log.length>200)base.log=base.log.slice(-200);
+        }
         payload=base;
         // Mettre à jour nos données locales avec la fusion
         deserialise(payload);
@@ -1470,7 +1609,29 @@ async function cloudLoad(){
     TEAMS[t]=[...new Set(TEAMS[t])];
   });
   if(JSON.stringify(TEAMS)!==teamsBefore)DIRTY.teams=true;
+  // Gestion automatique des congés programmés + reset FMPA annuel
+  let congeChanged=false;
+  DATA.forEach(a=>{
+    if(a.conge_debut&&a.conge_fin){
+      const deb=toDate(a.conge_debut),fin=toDate(a.conge_fin);
+      if(TODAY>fin){
+        // Congé terminé : retour disponible, on efface les dates
+        if(a.dispo==='conge')a.dispo='dispo';
+        a.conge_debut=null;a.conge_fin=null;
+        markDirtyAgent(a);congeChanged=true;
+      }else if(TODAY>=deb&&TODAY<=fin&&a.dispo==='dispo'){
+        a.dispo='conge';markDirtyAgent(a);congeChanged=true;
+      }
+    }
+    // Reset FMPA si nouvelle année
+    if(a.fmpa_annee&&a.fmpa_annee<TODAY.getFullYear()){
+      a.fmpa=0;a.fmpa_annee=TODAY.getFullYear();
+      markDirtyAgent(a);congeChanged=true;
+    }
+  });
+  if(congeChanged)setTimeout(()=>cloudSave(),1500);
   view=DATA.slice();
+  populateQualifFilter();
   updateStats();
   renderTable();
   renderBadges();
@@ -1551,6 +1712,7 @@ function setGarde(key,eq){
   if(!PLANNING[key])PLANNING[key]={eq:0,notes:''};
   PLANNING[key].eq=eq;
   DIRTY.planning=true;
+  addLog('Garde du '+key+' : '+(eq?'Équipe '+eq:'retirée'));
   cloudSave();renderGardes();
 }
 function setGardeNote(key,notes){
@@ -1630,6 +1792,7 @@ function saveVehicule(i){
   v.revision=parseMyDate(document.getElementById('vrev').value);
   v.notes=document.getElementById('vnotes').value.trim();
   DIRTY.vehicules=true;
+  addLog('Véhicule modifié : '+v.nom);
   cloudSave();closeOverlay();renderVehicules();
   showToast('Véhicule '+v.nom+' enregistré','success');
 }
@@ -1699,6 +1862,36 @@ function printEquipes(){
   '<body style="font-family:system-ui,sans-serif;padding:25px;color:#1a1a1a;max-width:800px;margin:0 auto">'+
   '<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #cc3300;padding-bottom:10px;margin-bottom:20px">'+
   '<h1 style="margin:0;font-size:18px">🔥 Équipes de garde — CIS Ruoms</h1>'+
+  '<div style="font-size:11px;color:#888;text-align:right">SDIS 07<br>Édité le '+TODAY.toLocaleDateString('fr-FR')+'</div></div>'+
+  body+
+  '<script>window.onload=()=>window.print();<\/script></body></html>');
+  w.document.close();
+}
+
+// ── TROMBINOSCOPE ─────────────────────────────────────────────
+function printTrombinoscope(){
+  const w=window.open('','_blank');
+  const thColors={1:'#0a5a35',2:'#3a2a9a',3:'#7a4500',4:'#8a2020',0:'#666'};
+  const thNames={1:'Équipe 1',2:'Équipe 2',3:'Équipe 3',4:'Équipe 4',0:'Non affectés'};
+  let body='';
+  [1,2,3,4,0].forEach(t=>{
+    const members=DATA.filter(a=>getTeam(a)===t&&a.dispo!=='suspendu');
+    if(!members.length)return;
+    members.sort((a,b)=>a.nom.localeCompare(b.nom));
+    body+='<div style="break-inside:avoid;margin-bottom:20px">'+
+    '<h2 style="color:'+thColors[t]+';font-size:14px;border-bottom:2px solid '+thColors[t]+';padding-bottom:4px;margin-bottom:10px">'+thNames[t]+' ('+members.length+')</h2>'+
+    '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px">'+
+    members.map(m=>'<div style="text-align:center;padding:8px 4px;border:1px solid #eee;border-radius:8px">'+
+      '<div style="width:44px;height:44px;border-radius:50%;background:'+avatarColor(m.nom)+';color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;margin:0 auto 6px">'+inits(m)+'</div>'+
+      '<div style="font-weight:700;font-size:11px">'+m.nom+'</div>'+
+      '<div style="font-size:10px;color:#666">'+m.prenom+'</div>'+
+      '<div style="font-size:9px;color:#999;margin-top:2px">'+m.grade+'</div>'+
+    '</div>').join('')+'</div></div>';
+  });
+  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Trombinoscope — CIS Ruoms</title></head>'+
+  '<body style="font-family:system-ui,sans-serif;padding:25px;color:#1a1a1a;max-width:800px;margin:0 auto">'+
+  '<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #cc3300;padding-bottom:10px;margin-bottom:20px">'+
+  '<h1 style="margin:0;font-size:18px">👥 Trombinoscope — CIS Ruoms</h1>'+
   '<div style="font-size:11px;color:#888;text-align:right">SDIS 07<br>Édité le '+TODAY.toLocaleDateString('fr-FR')+'</div></div>'+
   body+
   '<script>window.onload=()=>window.print();<\/script></body></html>');
