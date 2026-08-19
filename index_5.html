@@ -324,7 +324,7 @@ body.dark .compliance-bar-bg,body.dark .dash-bar-wrap{background:#3a3a42}
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2c0 6-8 8-8 14a8 8 0 0 0 16 0C20 10 12 8 12 2z"/></svg>
   <h1>CIS Ruoms — Gestion du Personnel</h1>
   <span class="hbadge">SDIS 07</span>
-  <span class="hbadge" style="opacity:.7" title="Version de l'application">v2.7</span>
+  <span class="hbadge" style="opacity:.7" title="Version de l'application">v2.8</span>
   <span class="hbadge notif-btn" id="notifBell" onclick="toggleNotifRequest()" title="Notifications navigateur">
     🔔 <span id="notifCount">0</span>
   </span>
@@ -533,6 +533,15 @@ body.dark .compliance-bar-bg,body.dark .dash-bar-wrap{background:#3a3a42}
       <p style="font-size:11px;color:#aaa;margin-top:5px">Envoyez ce lien à votre adjoint : il verra et modifiera exactement les mêmes données que vous. Il aura aussi besoin du code PIN.</p>
     </div>
     <div class="form-section">
+      <div class="form-section-title">Base de données connectée</div>
+      <p style="font-size:11px;font-family:monospace;background:#eee;padding:8px;border-radius:5px;word-break:break-all" id="binIdDisplay">—</p>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <input id="manualBinInput" placeholder="Coller un lien de partage ou un identifiant…" style="flex:1;padding:7px 9px;border:1px solid #ddd;border-radius:5px;font-size:12px">
+        <button class="btn btn-sm" onclick="connectManualBin()">Connecter</button>
+      </div>
+      <p style="font-size:11px;color:#aaa;margin-top:5px">⚠️ Si vous avez changé de navigateur (ex : Safari → Chrome) et que vos données semblent absentes, collez ici le lien de partage généré depuis l'ancien navigateur.</p>
+    </div>
+    <div class="form-section">
       <div class="form-section-title">Sauvegarde de secours</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-sm" onclick="exportBackupJSON()">💾 Télécharger une sauvegarde</button>
@@ -591,6 +600,7 @@ function openSettings(){
   document.getElementById('s-email').value=SETTINGS.emailCentre||'';
   document.getElementById('s-window').value=SETTINGS.reminderWindow||30;
   document.getElementById('s-fmpa').value=SETTINGS.fmpaObjectif||40;
+  document.getElementById('binIdDisplay').textContent=BIN_ID?('ID : '+BIN_ID+' ('+DATA.length+' agents chargés)'):'❌ Aucune base connectée — les données ne sont pas synchronisées !';
   document.getElementById('settingsOverlay').classList.add('open');
 }
 function closeSettings(){document.getElementById('settingsOverlay').classList.remove('open');}
@@ -1819,6 +1829,17 @@ function copyShareLink(){
   document.getElementById('drawer').innerHTML=html;
   document.getElementById('overlay').classList.add('open');
   closeSettings();
+}
+function connectManualBin(){
+  const raw=document.getElementById('manualBinInput').value.trim();
+  if(!raw){showToast('Collez un lien ou un identifiant','error');return;}
+  // Extraire l'ID depuis un lien complet ou accepter l'ID brut
+  const m=raw.match(/bin=([A-Za-z0-9]+)/)||raw.match(/^([A-Za-z0-9]{15,})$/);
+  if(!m){showToast('Format non reconnu — collez le lien complet ou l\'identifiant','error');return;}
+  if(!confirm('Se connecter à cette base ?\nLes données affichées seront remplacées par celles de cette base.'))return;
+  localStorage.setItem(JSONBIN_ID_KEY,m[1]);
+  showToast('Base connectée ! Rechargement…','success');
+  setTimeout(()=>location.reload(),1000);
 }
 function doCopyShareLink(){
   const input=document.getElementById('shareLinkInput');
