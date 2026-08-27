@@ -324,7 +324,7 @@ body.dark .compliance-bar-bg,body.dark .dash-bar-wrap{background:#3a3a42}
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2c0 6-8 8-8 14a8 8 0 0 0 16 0C20 10 12 8 12 2z"/></svg>
   <h1>CIS Ruoms — Gestion du Personnel</h1>
   <span class="hbadge">SDIS 07</span>
-  <span class="hbadge" style="opacity:.7" title="Version de l'application">v2.8</span>
+  <span class="hbadge" style="opacity:.7" title="Version de l'application">v2.9</span>
   <span class="hbadge notif-btn" id="notifBell" onclick="toggleNotifRequest()" title="Notifications navigateur">
     🔔 <span id="notifCount">0</span>
   </span>
@@ -360,6 +360,7 @@ body.dark .compliance-bar-bg,body.dark .dash-bar-wrap{background:#3a3a42}
     <button class="tab" data-tab="gardes" onclick="showTab('gardes')">🗓 Planning gardes</button>
     <button class="tab" data-tab="equipes" onclick="showTab('equipes')">🔴 Équipes</button>
     <button class="tab" data-tab="formations" onclick="showTab('formations')">📋 Formations<span class="tab-badge orange" id="badge-formations" style="display:none">0</span></button>
+    <button class="tab" data-tab="qualifs" onclick="showTab('qualifs')">🎓 Qualifications</button>
     <button class="tab" data-tab="calendrier" onclick="showTab('calendrier')">📅 Calendrier</button>
     <button class="tab" data-tab="vehicules" onclick="showTab('vehicules')">🚒 Véhicules<span class="tab-badge orange" id="badge-vehicules" style="display:none">0</span></button>
     <button class="tab" data-tab="tableau" onclick="showTab('tableau')">📊 Tableau de bord</button>
@@ -484,6 +485,18 @@ body.dark .compliance-bar-bg,body.dark .dash-bar-wrap{background:#3a3a42}
       <button class="btn btn-primary" onclick="openNewVehicule()">+ Ajouter un véhicule</button>
     </div>
     <div id="vehiculesContent"></div>
+  </div>
+
+  <!-- QUALIFICATIONS -->
+  <div id="panel-qualifs" class="panel">
+    <div class="rappel-toolbar">
+      <div class="rappel-toolbar-title">🎓 Matrice des qualifications</div>
+      <select id="qualifSelect" onchange="renderQualifHolders()" style="padding:7px 10px;border:1px solid #ccc;border-radius:6px;font-size:13px;background:#fff"></select>
+      <button class="btn btn-sm" onclick="printMatrice()">🖨 Imprimer la matrice</button>
+      <button class="btn btn-sm" onclick="openQualifCatalog()">⚙️ Gérer le catalogue</button>
+    </div>
+    <div id="qualifHolders"></div>
+    <div id="qualifMatrice"></div>
   </div>
 
   <!-- TABLEAU DE BORD -->
@@ -625,6 +638,20 @@ function age(naiss){if(!naiss)return null;const p=naiss.split('/');if(p.length!=
 function anciennete(e){if(!e)return null;const p=e.split('/');if(p.length!==3)return null;const d=new Date(+p[2],+p[1]-1,+p[0]);return Math.floor((TODAY-d)/31557600000);}
 function parseMyDate(s){if(!s||!s.trim())return null;const p=s.trim().split('/');if(p.length===3)return new Date(+p[2],+p[1]-1,+p[0]).toISOString().split('T')[0];return null;}
 function avatarColor(nom){const colors=['#1a5fa8','#0a5a35','#7a4500','#8a2020','#3a2a9a','#1a7a3a','#854f0b'];const h=(nom||'').split('').reduce((a,c)=>a+c.charCodeAt(0),0);return colors[h%colors.length];}
+
+// ── Statut d'une qualification d'un agent ────────────────────
+function qualifStatus(agentQual, catalogItem){
+  // agentQual : {obtenu, recyclage} | catalogItem : {validite en mois}
+  if(!agentQual||!agentQual.obtenu)return{cls:'nc',txt:'—'};
+  if(!catalogItem.validite)return{cls:'ok',txt:'✓ Acquis'}; // pas d'expiration
+  const ref=agentQual.recyclage||agentQual.obtenu;
+  const next=nextEcheance(ref,catalogItem.validite);
+  const mu=monthsUntil(next);
+  if(mu<0)return{cls:'danger',txt:'⚠ Expiré',date:next};
+  if(mu<3)return{cls:'warn',txt:'↗ '+Math.round(mu)+'m',date:next};
+  return{cls:'ok',txt:'✓ OK',date:next};
+}
+function agentHasQualif(a,code){return a.qualifications&&a.qualifications[code]&&a.qualifications[code].obtenu;}
 
 function nextEcheance(lastDate, seuil){
   const dt=toDate(lastDate);if(!dt)return null;
@@ -1318,6 +1345,18 @@ function openAgent(i){
   html+='</div>';
   html+='<div class="sec-lbl">Formations & échéances</div>';
   html+='<div class="fc-grid">'+fBlock('Recyclage SAP',a.sap,SEUILS.sap)+fBlock('Recyclage INC',a.inc,SEUILS.inc)+fBlock('Feux de forêt (FDF)',a.fdf,SEUILS.fdf)+fBlock('Visite médicale',a.med,SEUILS.med)+'</div>';
+  // Qualifications structurées
+  if(a.qualifications&&Object.keys(a.qualifications).length){
+    html+='<div class="sec-lbl">Qualifications</div><div style="display:flex;flex-wrap:wrap;gap:5px">';
+    QUALIF_CATALOG.forEach(q=>{
+      if(agentHasQualif(a,q.code)){
+        const st=qualifStatus(a.qualifications[q.code],q);
+        const cls=st.cls==='danger'?'p-danger':st.cls==='warn'?'p-warn':'p-ok';
+        html+='<span class="pill '+cls+'" title="'+q.label+(st.date&&q.validite?' — échéance '+fmt(st.date):'')+'">'+q.label+'</span>';
+      }
+    });
+    html+='</div>';
+  }
   // Actions rapides rappel
   if(a.email){
     html+='<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">';
@@ -1374,7 +1413,7 @@ function openEdit(i){
   html+=fi('eadr','Adresse',a.adresse,2);
   html+='</div></div>';
   html+='<div class="form-section"><div class="form-section-title">Missions</div><div class="ig">';
-  html+=fi('ef','Fonctions',a.fonctions)+fi('eq2','Qualifications',a.qualifs);
+  html+=fi('ef','Fonctions',a.fonctions)+fi('eq2','Qualifications (texte libre)',a.qualifs);
   html+=fi('emat','Matricule',a.mat)+fi('ebip','BIP',a.bip)+fi('etaille','Taille EPI',a.taille)+fi('ea','Aptitude',a.aptitude);
   html+='</div></div>';
   html+='<div class="form-section"><div class="form-section-title">Formations</div><div class="ig">';
@@ -1386,6 +1425,23 @@ function openEdit(i){
   html+='<div class="form-section"><div class="form-section-title">FMPA & EPI</div><div class="ig">';
   html+=fi('efmpa','Heures FMPA cette année',a.fmpa||'0')+fi('eepip','Perception EPI (JJ/MM/AAAA)',a.epi_percep?fmt(a.epi_percep):'');
   html+='</div></div>';
+  // Qualifications structurées
+  if(!a.qualifications)a.qualifications={};
+  html+='<div class="form-section"><div class="form-section-title">🎓 Qualifications suivies</div>';
+  html+='<p style="font-size:11px;color:#888;margin-bottom:8px">Cochez les qualifications de l\'agent et indiquez la date d\'obtention (ou de dernier recyclage).</p>';
+  qualifCats().forEach(cat=>{
+    html+='<div style="font-size:10px;font-weight:700;color:#cc3300;margin:8px 0 4px">'+cat+'</div>';
+    QUALIF_CATALOG.filter(q=>q.cat===cat).forEach(q=>{
+      const aq=a.qualifications[q.code]||{};
+      const has=!!aq.obtenu;
+      html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'+
+        '<label style="display:flex;align-items:center;gap:5px;flex:1;font-size:12px;font-weight:400;text-transform:none;letter-spacing:0;cursor:pointer">'+
+        '<input type="checkbox" id="q_'+q.code+'"'+(has?' checked':'')+' style="width:auto" onchange="document.getElementById(\'qd_'+q.code+'\').style.display=this.checked?\'block\':\'none\'">'+q.label+'</label>'+
+        '<input id="qd_'+q.code+'" value="'+(aq.obtenu?fmt(aq.obtenu):'')+'" placeholder="JJ/MM/AAAA" style="width:120px;padding:4px 8px;border:1px solid #ddd;border-radius:5px;font-size:11px;display:'+(has?'block':'none')+'">'+
+      '</div>';
+    });
+  });
+  html+='</div>';
   html+='<div class="form-section"><div class="form-section-title">Permis</div><div style="display:flex;gap:16px;flex-wrap:wrap">';
   html+=cb('epb','Permis B',a.permB)+cb('epc','Permis C',a.permC)+cb('epce','Permis CE',a.permCE);
   html+='</div></div>';
@@ -1439,6 +1495,17 @@ function saveEdit(i){
   a.permB=document.getElementById('epb').checked;
   a.permC=document.getElementById('epc').checked;
   a.permCE=document.getElementById('epce').checked;
+  // Qualifications structurées
+  if(!a.qualifications)a.qualifications={};
+  QUALIF_CATALOG.forEach(q=>{
+    const cb=document.getElementById('q_'+q.code);
+    if(cb&&cb.checked){
+      const d=parseMyDate(document.getElementById('qd_'+q.code).value);
+      a.qualifications[q.code]={obtenu:d||a.qualifications[q.code]&&a.qualifications[q.code].obtenu||TODAY.toISOString().split('T')[0]};
+    }else{
+      delete a.qualifications[q.code];
+    }
+  });
   setTeam(a.nom,a.prenom,+document.getElementById('et').value);
   markDirtyAgent(a);
   if(oldKey!==agentKey(a))DIRTY.deleted.add(oldKey); // nom/prénom corrigé
@@ -1481,19 +1548,23 @@ function showTab(name){
   if(name==='tableau')renderDashboard();
   if(name==='gardes')renderGardes();
   if(name==='vehicules')renderVehicules();
+  if(name==='qualifs')renderQualifs();
 }
 
 // ── JSONBin ───────────────────────────────────────────────────
 var BIN_ID=null;
 var needSave=false;
 function setSyncStatus(s,m){const el=document.getElementById('syncStatus');if(!el)return;el.textContent=m;el.style.background={ok:'rgba(26,122,58,.5)',saving:'rgba(224,112,0,.5)',err:'rgba(204,51,0,.5)',loading:'rgba(255,255,255,.2)'}[s]||'rgba(255,255,255,.2)';}
-function serialise(){return{data:DATA.map(a=>{const o=Object.assign({},a);o.historique=a.historique||[];return o;}),teams:TEAMS,planning:PLANNING,vehicules:VEHICULES,log:LOG};}
+function serialise(){return{data:DATA.map(a=>{const o=Object.assign({},a);o.historique=a.historique||[];return o;}),teams:TEAMS,planning:PLANNING,vehicules:VEHICULES,log:LOG,qualifCatalog:QUALIF_CATALOG};}
 function deserialise(obj){
   DATA=(obj.data||[]).map(a=>{if(!a.historique)a.historique=[];if(!a.dispo)a.dispo='dispo';if(!a.fdf)a.fdf=null;return a;});
   if(obj.teams)for(const k in obj.teams)TEAMS[k]=obj.teams[k];
   if(obj.planning)PLANNING=obj.planning;
   if(obj.vehicules)VEHICULES=obj.vehicules;
   if(obj.log)LOG=obj.log;
+  if(obj.qualifCatalog&&obj.qualifCatalog.length)QUALIF_CATALOG=obj.qualifCatalog;
+  // S'assurer que chaque agent a un objet qualifications
+  DATA.forEach(a=>{if(!a.qualifications)a.qualifications={};});
 }
 // ── Mode sombre ───────────────────────────────────────────────
 function toggleDarkMode(){
@@ -1745,6 +1816,33 @@ function exportGardesCSV(){
 // ── VÉHICULES ─────────────────────────────────────────────────
 var VEHICULES = []; // {nom, immat, ct, revision, notes}
 
+// ── CATALOGUE DE QUALIFICATIONS ───────────────────────────────
+// Chaque qualification : code, libellé, catégorie, durée de validité en mois (0 = pas d'expiration)
+var QUALIF_CATALOG = [
+  // SAP / Secours à personne
+  {code:'CA_VSAV',label:'Chef d\'agrès VSAV',cat:'SAP',validite:0},
+  {code:'EQ_SUAP',label:'Équipier SUAP',cat:'SAP',validite:0},
+  {code:'CO_VSAV',label:'Conducteur VSAV',cat:'SAP',validite:0},
+  // INC / Incendie
+  {code:'CA_FPT',label:'Chef d\'agrès FPT',cat:'INC',validite:0},
+  {code:'CE_FPT',label:'Conducteur/Équipier FPT',cat:'INC',validite:0},
+  // FDF / Feux de forêt
+  {code:'FDF1',label:'FDF 1',cat:'FDF',validite:0},
+  {code:'FDF2',label:'FDF 2',cat:'FDF',validite:0},
+  {code:'CA_CCF',label:'Chef d\'agrès CCF',cat:'FDF',validite:0},
+  // SR / Secours routier
+  {code:'EQ_SR',label:'Équipier SR',cat:'SR',validite:0},
+  {code:'CA_VSR',label:'Chef d\'agrès VSR',cat:'SR',validite:0},
+  // COD / Conduite
+  {code:'COD1',label:'COD 1 (VL)',cat:'COD',validite:0},
+  {code:'COD2',label:'COD 2 (PL)',cat:'COD',validite:0},
+  // DIV / Divers
+  {code:'CATE',label:'CATE',cat:'DIV',validite:0},
+];
+function qualifByCode(code){return QUALIF_CATALOG.find(q=>q.code===code);}
+function qualifCats(){return [...new Set(QUALIF_CATALOG.map(q=>q.cat))];}
+// Données par agent : a.qualifications = { CODE: {obtenu:'2025-01-15', recyclage:null} }
+
 function renderVehicules(){
   const el=document.getElementById('vehiculesContent');if(!el)return;
   // Badge
@@ -1885,6 +1983,130 @@ function printEquipes(){
   '<h1 style="margin:0;font-size:18px">🔥 Équipes de garde — CIS Ruoms</h1>'+
   '<div style="font-size:11px;color:#888;text-align:right">SDIS 07<br>Édité le '+TODAY.toLocaleDateString('fr-FR')+'</div></div>'+
   body+
+  '<script>window.onload=()=>window.print();<\/script></body></html>');
+  w.document.close();
+}
+
+// ── QUALIFICATIONS : rendu ────────────────────────────────────
+function renderQualifs(){
+  // Peupler le sélecteur
+  const sel=document.getElementById('qualifSelect');
+  if(sel){
+    const cur=sel.value;
+    let opts='<option value="">— Voir les titulaires par qualification —</option>';
+    qualifCats().forEach(cat=>{
+      opts+='<optgroup label="'+cat+'">';
+      QUALIF_CATALOG.filter(q=>q.cat===cat).forEach(q=>{
+        opts+='<option value="'+q.code+'"'+(q.code===cur?' selected':'')+'>'+q.label+'</option>';
+      });
+      opts+='</optgroup>';
+    });
+    sel.innerHTML=opts;
+  }
+  renderQualifHolders();
+  renderMatrice();
+}
+
+function renderQualifHolders(){
+  const el=document.getElementById('qualifHolders');if(!el)return;
+  const code=document.getElementById('qualifSelect').value;
+  if(!code){el.innerHTML='';return;}
+  const item=qualifByCode(code);
+  const holders=DATA.filter(a=>agentHasQualif(a,code)&&a.dispo!=='suspendu');
+  const nonHolders=DATA.filter(a=>!agentHasQualif(a,code)&&a.dispo!=='suspendu');
+  el.innerHTML='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">'+
+    '<div class="dash-card"><div class="dash-card-title" style="color:#1a7a3a">✓ Titulaires ('+holders.length+')</div>'+
+      (holders.length?holders.map(a=>{
+        const st=qualifStatus(a.qualifications[code],item);
+        const stColor=st.cls==='danger'?'#cc3300':st.cls==='warn'?'#e07000':'#1a7a3a';
+        return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f5f5f0;cursor:pointer" onclick="openAgent('+DATA.indexOf(a)+')">'+
+          '<div style="width:28px;height:28px;border-radius:50%;background:'+avatarColor(a.nom)+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700">'+inits(a)+'</div>'+
+          '<span style="flex:1;font-size:12px;font-weight:600">'+a.nom+' '+a.prenom+'</span>'+
+          '<span style="font-size:11px;color:'+stColor+';font-weight:600">'+st.txt+(st.date&&item.validite?' ('+fmt(st.date)+')':'')+'</span></div>';
+      }).join(''):'<p style="font-size:12px;color:#aaa">Aucun titulaire</p>')+
+    '</div>'+
+    '<div class="dash-card"><div class="dash-card-title" style="color:#999">Non titulaires ('+nonHolders.length+')</div>'+
+      '<div style="display:flex;flex-wrap:wrap;gap:5px">'+nonHolders.map(a=>'<span class="pill p-nc" style="cursor:pointer" onclick="openAgent('+DATA.indexOf(a)+')">'+a.nom+' '+a.prenom[0]+'.</span>').join('')+'</div>'+
+    '</div>'+
+  '</div>';
+}
+
+function renderMatrice(){
+  const el=document.getElementById('qualifMatrice');if(!el)return;
+  const agents=DATA.filter(a=>a.dispo!=='suspendu').sort((a,b)=>a.nom.localeCompare(b.nom));
+  let html='<div class="dash-card"><div class="dash-card-title">Matrice complète — agents × qualifications</div>';
+  html+='<div style="overflow-x:auto"><table style="min-width:900px"><thead><tr><th style="position:sticky;left:0;background:#f9f9f7">Agent</th>';
+  QUALIF_CATALOG.forEach(q=>{html+='<th title="'+q.label+'" style="text-align:center;font-size:9px">'+q.code.replace(/_/g,' ')+'</th>';});
+  html+='</tr></thead><tbody>';
+  agents.forEach(a=>{
+    html+='<tr><td style="font-weight:700;position:sticky;left:0;background:#fff">'+a.nom+' '+a.prenom[0]+'.</td>';
+    QUALIF_CATALOG.forEach(q=>{
+      const has=agentHasQualif(a,q.code);
+      if(has){
+        const st=qualifStatus(a.qualifications[q.code],q);
+        const bg=st.cls==='danger'?'#ffe8e5':st.cls==='warn'?'#fff0dd':'#e0f5e8';
+        const fg=st.cls==='danger'?'#8a2020':st.cls==='warn'?'#8a5500':'#1a7a3a';
+        html+='<td style="text-align:center;background:'+bg+';color:'+fg+';font-weight:700" title="'+st.txt+'">●</td>';
+      }else{
+        html+='<td style="text-align:center;color:#eee">·</td>';
+      }
+    });
+    html+='</tr>';
+  });
+  html+='</tbody></table></div></div>';
+  el.innerHTML=html;
+}
+
+// ── Catalogue : gestion ───────────────────────────────────────
+function openQualifCatalog(){
+  let html='<div class="drawer-hdr"><h2>⚙️ Catalogue des qualifications</h2><button class="x-btn" onclick="closeOverlay()">×</button></div>';
+  html+='<p style="font-size:12px;color:#888;margin-bottom:12px">Ajoutez ou modifiez les qualifications suivies. La durée de validité en mois déclenche les alertes (0 = pas d\'expiration).</p>';
+  html+='<div id="catalogList">';
+  QUALIF_CATALOG.forEach((q,i)=>{
+    html+='<div style="display:flex;gap:6px;margin-bottom:6px;align-items:center">'+
+      '<input value="'+q.label.replace(/"/g,'&quot;')+'" onchange="QUALIF_CATALOG['+i+'].label=this.value" style="flex:2;padding:5px 8px;border:1px solid #ddd;border-radius:5px;font-size:12px" placeholder="Libellé">'+
+      '<input value="'+q.cat+'" onchange="QUALIF_CATALOG['+i+'].cat=this.value.toUpperCase()" style="width:70px;padding:5px 8px;border:1px solid #ddd;border-radius:5px;font-size:12px" placeholder="Cat.">'+
+      '<input type="number" value="'+q.validite+'" onchange="QUALIF_CATALOG['+i+'].validite=+this.value" style="width:60px;padding:5px 8px;border:1px solid #ddd;border-radius:5px;font-size:12px" title="Validité en mois">'+
+      '<button class="btn btn-sm btn-danger" onclick="QUALIF_CATALOG.splice('+i+',1);openQualifCatalog()">🗑</button>'+
+    '</div>';
+  });
+  html+='</div>';
+  html+='<button class="btn btn-sm" onclick="QUALIF_CATALOG.push({code:\'Q_\'+Date.now(),label:\'Nouvelle qualif\',cat:\'DIV\',validite:0});openQualifCatalog()">+ Ajouter une qualification</button>';
+  html+='<div class="btn-row"><button class="btn btn-primary" onclick="saveCatalog()">💾 Enregistrer le catalogue</button><button class="btn" onclick="closeOverlay()">Fermer</button></div>';
+  document.getElementById('drawer').innerHTML=html;
+  document.getElementById('overlay').classList.add('open');
+}
+function saveCatalog(){
+  // Générer un code pour les nouvelles qualifs sans code propre
+  QUALIF_CATALOG.forEach(q=>{if(!q.code)q.code='Q_'+Date.now()+Math.random().toString(36).slice(2,5);});
+  DIRTY.full=true; // le catalogue touche à tout
+  addLog('Catalogue de qualifications modifié');
+  cloudSave();closeOverlay();renderQualifs();
+  showToast('Catalogue enregistré','success');
+}
+
+function printMatrice(){
+  const w=window.open('','_blank');
+  const agents=DATA.filter(a=>a.dispo!=='suspendu').sort((a,b)=>a.nom.localeCompare(b.nom));
+  let head='<th style="text-align:left;padding:5px;font-size:9px;border:1px solid #ddd">AGENT</th>';
+  QUALIF_CATALOG.forEach(q=>head+='<th style="padding:5px;font-size:8px;border:1px solid #ddd;writing-mode:vertical-rl;transform:rotate(180deg);height:80px" title="'+q.label+'">'+q.label+'</th>');
+  let rows='';
+  agents.forEach(a=>{
+    rows+='<tr><td style="font-weight:700;padding:5px;font-size:10px;border:1px solid #ddd;white-space:nowrap">'+a.nom+' '+a.prenom[0]+'.</td>';
+    QUALIF_CATALOG.forEach(q=>{
+      const has=agentHasQualif(a,q.code);
+      const st=has?qualifStatus(a.qualifications[q.code],q):null;
+      const mark=has?(st.cls==='danger'?'✗':'●'):'';
+      const color=has?(st.cls==='danger'?'#cc3300':st.cls==='warn'?'#e07000':'#1a7a3a'):'#fff';
+      rows+='<td style="text-align:center;border:1px solid #ddd;color:'+color+';font-weight:700">'+mark+'</td>';
+    });
+    rows+='</tr>';
+  });
+  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Matrice qualifications — CIS Ruoms</title></head>'+
+  '<body style="font-family:system-ui,sans-serif;padding:20px;color:#1a1a1a"><div style="display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #cc3300;padding-bottom:10px;margin-bottom:16px">'+
+  '<h1 style="margin:0;font-size:16px">🎓 Matrice des qualifications — CIS Ruoms</h1><div style="font-size:11px;color:#888;text-align:right">SDIS 07<br>Édité le '+TODAY.toLocaleDateString('fr-FR')+'</div></div>'+
+  '<table style="border-collapse:collapse;width:100%"><thead><tr>'+head+'</tr></thead><tbody>'+rows+'</tbody></table>'+
+  '<p style="font-size:10px;color:#888;margin-top:12px">● = acquis · ✗ = expiré</p>'+
   '<script>window.onload=()=>window.print();<\/script></body></html>');
   w.document.close();
 }
