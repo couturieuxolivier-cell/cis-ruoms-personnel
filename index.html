@@ -324,7 +324,7 @@ body.dark .compliance-bar-bg,body.dark .dash-bar-wrap{background:#3a3a42}
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2c0 6-8 8-8 14a8 8 0 0 0 16 0C20 10 12 8 12 2z"/></svg>
   <h1>CIS Ruoms — Gestion du Personnel</h1>
   <span class="hbadge">SDIS 07</span>
-  <span class="hbadge" style="opacity:.7" title="Version de l'application">v2.9</span>
+  <span class="hbadge" style="opacity:.7" title="Version de l'application">v3.0</span>
   <span class="hbadge notif-btn" id="notifBell" onclick="toggleNotifRequest()" title="Notifications navigateur">
     🔔 <span id="notifCount">0</span>
   </span>
@@ -399,6 +399,7 @@ body.dark .compliance-bar-bg,body.dark .dash-bar-wrap{background:#3a3a42}
       </select>
       <button class="btn btn-primary" onclick="openNew()">+ Ajouter</button>
       <button class="btn" onclick="exportCSV()">📤 CSV</button>
+      <button class="btn" onclick="printRepertoire()">📞 Répertoire</button>
       <button class="btn" onclick="document.getElementById('csvImportInput').click()">📥 Importer CSV</button>
       <input type="file" id="csvImportInput" accept=".csv" style="display:none" onchange="importCSV(this)">
       <button class="btn" onclick="window.print()">🖨 Imprimer</button>
@@ -1268,6 +1269,47 @@ function renderBadges(){
 }
 
 // ── Export CSV ────────────────────────────────────────────────
+function printRepertoire(){
+  // Agents avec au moins un téléphone, triés alphabétiquement
+  const agents=DATA.filter(a=>a.dispo!=='suspendu'&&(a.tel||a.ctTel)).sort((a,b)=>a.nom.localeCompare(b.nom));
+  const w=window.open('','_blank');
+  let rows='';
+  agents.forEach(a=>{
+    const t=getTeam(a);
+    rows+='<tr style="border-bottom:1px solid #eee">'+
+      '<td style="padding:7px 10px;font-weight:700;white-space:nowrap">'+a.nom+' '+a.prenom+'</td>'+
+      '<td style="padding:7px 10px;font-size:11px;color:#666">'+a.grade+(t?' · Éq.'+t:'')+'</td>'+
+      '<td style="padding:7px 10px;font-weight:600;white-space:nowrap">'+(a.tel||'—')+'</td>'+
+      '<td style="padding:7px 10px;font-size:11px;color:#666">'+(a.email||'—')+'</td>'+
+      '<td style="padding:7px 10px;font-size:11px">'+(a.contact?a.contact+(a.ctTel?' — '+a.ctTel:''):'—')+'</td>'+
+    '</tr>';
+  });
+  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Répertoire téléphonique — CIS Ruoms</title></head>'+
+  '<body style="font-family:system-ui,sans-serif;padding:25px;color:#1a1a1a;max-width:800px;margin:0 auto">'+
+  '<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #cc3300;padding-bottom:10px;margin-bottom:16px">'+
+  '<h1 style="margin:0;font-size:18px">📞 Répertoire téléphonique — CIS Ruoms</h1>'+
+  '<div style="font-size:11px;color:#888;text-align:right">SDIS 07<br>Édité le '+TODAY.toLocaleDateString('fr-FR')+' · '+agents.length+' agents</div></div>'+
+  '<table style="width:100%;border-collapse:collapse;font-size:13px">'+
+  '<thead><tr style="background:#f5f5f0">'+
+  '<th style="text-align:left;padding:7px 10px;font-size:10px;color:#888">AGENT</th>'+
+  '<th style="text-align:left;padding:7px 10px;font-size:10px;color:#888">GRADE / ÉQUIPE</th>'+
+  '<th style="text-align:left;padding:7px 10px;font-size:10px;color:#888">TÉLÉPHONE</th>'+
+  '<th style="text-align:left;padding:7px 10px;font-size:10px;color:#888">EMAIL</th>'+
+  '<th style="text-align:left;padding:7px 10px;font-size:10px;color:#888">CONTACT URGENCE</th>'+
+  '</tr></thead><tbody>'+rows+'</tbody></table>'+
+  '<p style="font-size:10px;color:#aaa;margin-top:14px">Document confidentiel — réservé à un usage interne au CIS Ruoms.</p>'+
+  '<script>window.onload=()=>window.print();<\/script></body></html>');
+  w.document.close();
+}
+
+function exportRepertoireCSV(){
+  const agents=DATA.filter(a=>a.dispo!=='suspendu'&&(a.tel||a.ctTel)).sort((a,b)=>a.nom.localeCompare(b.nom));
+  const cols=['Nom','Prénom','Grade','Équipe','Téléphone','Email','Contact urgence','Tél. urgence'];
+  const rows=agents.map(a=>[a.nom,a.prenom,a.grade,getTeam(a)||'NC',a.tel||'',a.email||'',a.contact||'',a.ctTel||'']);
+  downloadCSV('repertoire_telephonique_cis_ruoms.csv',cols,rows);
+  showToast('Répertoire exporté','success');
+}
+
 function exportCSV(){
   const cols=['Nom','Prénom','Grade','Statut','Équipe','Disponibilité','Fonctions','SAP','INC','Visite méd.','Aptitude','Tél.','Email','Adresse'];
   const rows=view.map(a=>[
