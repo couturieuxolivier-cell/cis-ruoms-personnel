@@ -324,7 +324,7 @@ body.dark .compliance-bar-bg,body.dark .dash-bar-wrap{background:#3a3a42}
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2c0 6-8 8-8 14a8 8 0 0 0 16 0C20 10 12 8 12 2z"/></svg>
   <h1>CIS Ruoms — Gestion du Personnel</h1>
   <span class="hbadge">SDIS 07</span>
-  <span class="hbadge" style="opacity:.7" title="Version de l'application">v3.0</span>
+  <span class="hbadge" style="opacity:.7" title="Version de l'application">v3.1</span>
   <span class="hbadge notif-btn" id="notifBell" onclick="toggleNotifRequest()" title="Notifications navigateur">
     🔔 <span id="notifCount">0</span>
   </span>
@@ -760,6 +760,14 @@ function getAlerts(a){
   if(!a.aptitude)iss.push({txt:'Aptitude non renseignée',cls:'orange'});
   if(a.dispo==='suspendu')iss.push({txt:'Suspendu',cls:'red'});
   if(a.dispo==='indispo')iss.push({txt:'Indisponible',cls:'orange'});
+  // Visites médicales permis
+  [['vmC','VM permis C'],['vmD','VM permis D (ambu.)']].forEach(([k,lbl])=>{
+    if(a[k]){
+      const days=daysUntil(toDate(a[k]));
+      if(days<0)iss.push({txt:lbl+' expirée ('+fmt(a[k])+')',cls:'red'});
+      else if(days<=31)iss.push({txt:lbl+' dans '+days+'j',cls:'orange'});
+    }
+  });
   return iss;
 }
 
@@ -781,6 +789,21 @@ function getAllDeadlines(maxDays){
           if(days!==null&&days<=(maxDays||SETTINGS.reminderWindow||30)){
             d.push({agent:a,agentIndex:i,type:c.label,key:c.key,cls:c.cls,nextDate:next,days:days,email:a.email,tel:a.tel});
           }
+        }
+      }
+    });
+    // Visites médicales permis (dates d'échéance absolues, rappel 1 mois avant)
+    const permChecks=[
+      {key:'vmC',label:'Visite médicale permis C (PL)'},
+      {key:'vmD',label:'Visite médicale permis D (Ambulance)'},
+    ];
+    permChecks.forEach(pc=>{
+      if(a[pc.key]){
+        const next=toDate(a[pc.key]);
+        const days=daysUntil(next);
+        // fenêtre d'affichage : on montre dès 31 j avant (rappel 1 mois)
+        if(days!==null&&days<=Math.max(31,(maxDays||SETTINGS.reminderWindow||30))){
+          d.push({agent:a,agentIndex:i,type:pc.label,key:pc.key,cls:'med',nextDate:next,days:days,email:a.email,tel:a.tel});
         }
       }
     });
@@ -1383,8 +1406,22 @@ function openAgent(i){
   html+='<span class="pill '+(a.permB?'p-ok':'p-nc')+'">B: '+(a.permB?'OUI':'NON')+'</span>';
   html+='<span class="pill '+(a.permC?'p-ok':'p-nc')+'">C: '+(a.permC?'OUI':'NON')+'</span>';
   html+='<span class="pill '+(a.permCE?'p-ok':'p-nc')+'">CE: '+(a.permCE?'OUI':'NON')+'</span>';
+  html+='<span class="pill '+(a.permD?'p-ok':'p-nc')+'">D: '+(a.permD?'OUI':'NON')+'</span>';
   if(a.taille)html+='<span class="pill p-nc">EPI: '+a.taille+'</span>';
   html+='</div>';
+  if(a.numPermis||a.vmC||a.vmD){
+    html+='<div class="ig" style="margin-top:8px">';
+    if(a.numPermis)html+='<div><div class="ir-lbl">N° permis</div><div class="ir-val">'+a.numPermis+'</div></div>';
+    function vmCell(d,lbl){
+      if(!d)return'';
+      const days=daysUntil(toDate(d));
+      const col=days<0?'#cc3300':days<=31?'#e07000':'#1a7a3a';
+      const suf=days<0?' (expirée)':days<=31?' (J-'+days+')':'';
+      return'<div><div class="ir-lbl">'+lbl+'</div><div class="ir-val" style="color:'+col+'">'+fmt(d)+suf+'</div></div>';
+    }
+    html+=vmCell(a.vmC,'VM permis C / PL')+vmCell(a.vmD,'VM permis D / Ambulance');
+    html+='</div>';
+  }
   html+='<div class="sec-lbl">Formations & échéances</div>';
   html+='<div class="fc-grid">'+fBlock('Recyclage SAP',a.sap,SEUILS.sap)+fBlock('Recyclage INC',a.inc,SEUILS.inc)+fBlock('Feux de forêt (FDF)',a.fdf,SEUILS.fdf)+fBlock('Visite médicale',a.med,SEUILS.med)+'</div>';
   // Qualifications structurées
@@ -1403,6 +1440,8 @@ function openAgent(i){
   if(a.email){
     html+='<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">';
     if(a.med){const next=nextEcheance(a.med,SEUILS.med);html+='<a href="'+generateReminderEmail(a,'visite médicale',next)+'" class="btn btn-sm btn-email" style="text-decoration:none">📧 Rappel visite méd.</a>';}
+    if(a.vmC){html+='<a href="'+generateReminderEmail(a,'visite médicale permis C (PL)',toDate(a.vmC))+'" class="btn btn-sm btn-email" style="text-decoration:none">📧 Rappel VM permis C</a>';}
+    if(a.vmD){html+='<a href="'+generateReminderEmail(a,'visite médicale permis D (Ambulance)',toDate(a.vmD))+'" class="btn btn-sm btn-email" style="text-decoration:none">📧 Rappel VM permis D</a>';}
     if(a.sap){const next=nextEcheance(a.sap,SEUILS.sap);html+='<a href="'+generateReminderEmail(a,'recyclage SAP',next)+'" class="btn btn-sm btn-email" style="text-decoration:none">📧 Rappel SAP</a>';}
     html+='</div>';
   }
@@ -1484,8 +1523,17 @@ function openEdit(i){
     });
   });
   html+='</div>';
-  html+='<div class="form-section"><div class="form-section-title">Permis</div><div style="display:flex;gap:16px;flex-wrap:wrap">';
-  html+=cb('epb','Permis B',a.permB)+cb('epc','Permis C',a.permC)+cb('epce','Permis CE',a.permCE);
+  html+='<div class="form-section"><div class="form-section-title">Permis de conduire</div>';
+  html+='<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px">';
+  html+=cb('epb','Permis B',a.permB)+cb('epc','Permis C (PL)',a.permC)+cb('epce','Permis CE',a.permCE)+cb('epd','Permis D (Ambulance)',a.permD);
+  html+='</div>';
+  html+='<div class="ig">';
+  html+=fi('enumpermis','N° de permis de conduire',a.numPermis);
+  html+='<div></div>';
+  html+=fi('evmC','Échéance VM permis C / PL (JJ/MM/AAAA)',a.vmC?fmt(a.vmC):'');
+  html+=fi('evmD','Échéance VM permis D / Ambulance (JJ/MM/AAAA)',a.vmD?fmt(a.vmD):'');
+  html+='</div>';
+  html+='<p style="font-size:11px;color:#aaa;margin-top:6px">Indiquez la date d\'échéance de la visite médicale. Un rappel apparaît automatiquement 1 mois avant.</p>';
   html+='</div></div>';
   html+='<div class="form-section"><div class="form-section-title">Contact d\'urgence</div><div class="ig">';
   html+=fi('ect','Personne à prévenir',a.contact)+fi('ectl','Téléphone urgence',a.ctTel);
@@ -1537,6 +1585,10 @@ function saveEdit(i){
   a.permB=document.getElementById('epb').checked;
   a.permC=document.getElementById('epc').checked;
   a.permCE=document.getElementById('epce').checked;
+  a.permD=document.getElementById('epd').checked;
+  a.numPermis=document.getElementById('enumpermis').value.trim();
+  a.vmC=parseMyDate(document.getElementById('evmC').value);
+  a.vmD=parseMyDate(document.getElementById('evmD').value);
   // Qualifications structurées
   if(!a.qualifications)a.qualifications={};
   QUALIF_CATALOG.forEach(q=>{
@@ -1605,8 +1657,14 @@ function deserialise(obj){
   if(obj.vehicules)VEHICULES=obj.vehicules;
   if(obj.log)LOG=obj.log;
   if(obj.qualifCatalog&&obj.qualifCatalog.length)QUALIF_CATALOG=obj.qualifCatalog;
-  // S'assurer que chaque agent a un objet qualifications
-  DATA.forEach(a=>{if(!a.qualifications)a.qualifications={};});
+  // S'assurer que chaque agent a les champs attendus
+  DATA.forEach(a=>{
+    if(!a.qualifications)a.qualifications={};
+    if(a.permD===undefined)a.permD=false;
+    if(a.numPermis===undefined)a.numPermis='';
+    if(a.vmC===undefined)a.vmC=null;
+    if(a.vmD===undefined)a.vmD=null;
+  });
 }
 // ── Mode sombre ───────────────────────────────────────────────
 function toggleDarkMode(){
@@ -2276,6 +2334,21 @@ function exportICS(){
     });
   });
 
+  // 3bis. Visites médicales permis (rappel 1 mois avant)
+  DATA.forEach(a=>{
+    [['vmC','Visite médicale permis C (PL)'],['vmD','Visite médicale permis D (Ambulance)']].forEach(([k,lbl])=>{
+      if(!a[k])return;
+      const d=toDate(a[k]);
+      if(d<TODAY)return;
+      events.push({
+        date:d,
+        title:'🚑 '+lbl+' — '+a.nom+' '+a.prenom,
+        desc:'CIS Ruoms : échéance '+lbl.toLowerCase()+' pour '+a.nom+' '+a.prenom+(a.tel?' ('+a.tel+')':''),
+        alarmDays:30
+      });
+    });
+  });
+
   // 4. Contrôles techniques véhicules
   VEHICULES.forEach(v=>{
     [['ct','Contrôle technique'],['revision','Révision']].forEach(([key,label])=>{
@@ -2442,7 +2515,10 @@ function printFiche(i){
   frow('Date de naissance',a.naissance)+frow('Entrée au CIS',a.entree_cis)+frow('Matricule',a.mat)+frow('Téléphone',a.tel)+frow('Email',a.email)+frow('Adresse',a.adresse)+'</table>'+
   '<h3 style="color:#cc3300;font-size:13px;text-transform:uppercase;margin-top:20px">Missions & qualifications</h3><table style="width:100%;border-collapse:collapse">'+
   frow('Fonctions',a.fonctions)+frow('Qualifications',a.qualifs)+frow('BIP',a.bip)+frow('Taille EPI',a.taille)+
-  frow('Permis','B: '+(a.permB?'OUI':'NON')+' · C: '+(a.permC?'OUI':'NON')+' · CE: '+(a.permCE?'OUI':'NON'))+'</table>'+
+  frow('Permis','B: '+(a.permB?'OUI':'NON')+' · C: '+(a.permC?'OUI':'NON')+' · CE: '+(a.permCE?'OUI':'NON')+' · D: '+(a.permD?'OUI':'NON'))+
+  (a.numPermis?frow('N° permis',a.numPermis):'')+
+  (a.vmC?frow('VM permis C / PL',fmt(a.vmC)):'')+
+  (a.vmD?frow('VM permis D / Ambulance',fmt(a.vmD)):'')+'</table>'+
   '<h3 style="color:#cc3300;font-size:13px;text-transform:uppercase;margin-top:20px">Formations & aptitude</h3><table style="width:100%;border-collapse:collapse">'+
   fdate('Recyclage SAP',a.sap,SEUILS.sap)+fdate('Recyclage INC',a.inc,SEUILS.inc)+fdate('FDF',a.fdf,SEUILS.fdf)+fdate('Visite médicale',a.med,SEUILS.med)+frow('Aptitude',a.aptitude)+'</table>'+
   (a.contact?'<h3 style="color:#cc3300;font-size:13px;text-transform:uppercase;margin-top:20px">Contact d\'urgence</h3><table style="width:100%;border-collapse:collapse">'+frow('Personne',a.contact)+frow('Téléphone',a.ctTel)+'</table>':'')+
