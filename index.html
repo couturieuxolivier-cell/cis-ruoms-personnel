@@ -324,7 +324,7 @@ body.dark .compliance-bar-bg,body.dark .dash-bar-wrap{background:#3a3a42}
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2c0 6-8 8-8 14a8 8 0 0 0 16 0C20 10 12 8 12 2z"/></svg>
   <h1>CIS Ruoms — Gestion du Personnel</h1>
   <span class="hbadge">SDIS 07</span>
-  <span class="hbadge" style="opacity:.7" title="Version de l'application">v3.1</span>
+  <span class="hbadge" style="opacity:.7" title="Version de l'application">v3.2</span>
   <span class="hbadge notif-btn" id="notifBell" onclick="toggleNotifRequest()" title="Notifications navigateur">
     🔔 <span id="notifCount">0</span>
   </span>
@@ -363,6 +363,7 @@ body.dark .compliance-bar-bg,body.dark .dash-bar-wrap{background:#3a3a42}
     <button class="tab" data-tab="qualifs" onclick="showTab('qualifs')">🎓 Qualifications</button>
     <button class="tab" data-tab="calendrier" onclick="showTab('calendrier')">📅 Calendrier</button>
     <button class="tab" data-tab="vehicules" onclick="showTab('vehicules')">🚒 Véhicules<span class="tab-badge orange" id="badge-vehicules" style="display:none">0</span></button>
+    <button class="tab" data-tab="recrues" onclick="showTab('recrues')">🆕 Nouvelles recrues<span class="tab-badge" id="badge-recrues" style="display:none">0</span></button>
     <button class="tab" data-tab="tableau" onclick="showTab('tableau')">📊 Tableau de bord</button>
   </div>
 
@@ -478,6 +479,16 @@ body.dark .compliance-bar-bg,body.dark .dash-bar-wrap{background:#3a3a42}
       <button class="btn btn-sm" onclick="exportGardesCSV()">📤 Export CSV</button>
     </div>
     <div id="gardesContent"></div>
+  </div>
+
+  <!-- NOUVELLES RECRUES -->
+  <div id="panel-recrues" class="panel">
+    <div class="rappel-toolbar">
+      <div class="rappel-toolbar-title">🆕 Suivi des nouvelles recrues — Parcours d'engagement</div>
+      <button class="btn btn-sm btn-primary" onclick="openNewRecrue()">+ Ajouter une recrue</button>
+      <button class="btn btn-sm" onclick="printRecrues()">🖨 Imprimer le suivi</button>
+    </div>
+    <div id="recruesContent"></div>
   </div>
 
   <!-- VÉHICULES -->
@@ -1643,13 +1654,14 @@ function showTab(name){
   if(name==='gardes')renderGardes();
   if(name==='vehicules')renderVehicules();
   if(name==='qualifs')renderQualifs();
+  if(name==='recrues')renderRecrues();
 }
 
 // ── JSONBin ───────────────────────────────────────────────────
 var BIN_ID=null;
 var needSave=false;
 function setSyncStatus(s,m){const el=document.getElementById('syncStatus');if(!el)return;el.textContent=m;el.style.background={ok:'rgba(26,122,58,.5)',saving:'rgba(224,112,0,.5)',err:'rgba(204,51,0,.5)',loading:'rgba(255,255,255,.2)'}[s]||'rgba(255,255,255,.2)';}
-function serialise(){return{data:DATA.map(a=>{const o=Object.assign({},a);o.historique=a.historique||[];return o;}),teams:TEAMS,planning:PLANNING,vehicules:VEHICULES,log:LOG,qualifCatalog:QUALIF_CATALOG};}
+function serialise(){return{data:DATA.map(a=>{const o=Object.assign({},a);o.historique=a.historique||[];return o;}),teams:TEAMS,planning:PLANNING,vehicules:VEHICULES,log:LOG,qualifCatalog:QUALIF_CATALOG,recrues:RECRUES};}
 function deserialise(obj){
   DATA=(obj.data||[]).map(a=>{if(!a.historique)a.historique=[];if(!a.dispo)a.dispo='dispo';if(!a.fdf)a.fdf=null;return a;});
   if(obj.teams)for(const k in obj.teams)TEAMS[k]=obj.teams[k];
@@ -1657,6 +1669,7 @@ function deserialise(obj){
   if(obj.vehicules)VEHICULES=obj.vehicules;
   if(obj.log)LOG=obj.log;
   if(obj.qualifCatalog&&obj.qualifCatalog.length)QUALIF_CATALOG=obj.qualifCatalog;
+  if(obj.recrues)RECRUES=obj.recrues;
   // S'assurer que chaque agent a les champs attendus
   DATA.forEach(a=>{
     if(!a.qualifications)a.qualifications={};
@@ -1915,6 +1928,169 @@ function exportGardesCSV(){
 
 // ── VÉHICULES ─────────────────────────────────────────────────
 var VEHICULES = []; // {nom, immat, ct, revision, notes}
+
+// ── NOUVELLES RECRUES : parcours d'engagement ────────────────
+// Étapes du parcours (d'après le document officiel SDIS 07)
+const RECRUE_ETAPES = [
+  {n:1,titre:'Première rencontre',desc:'Rencontre avec le chef de centre (ou médecin de groupement pour le SSSM) et remise du dossier d\'engagement.'},
+  {n:2,titre:'Tests d\'aptitude',desc:'Tests physiques et psychomoteurs pour apprécier les capacités du candidat.'},
+  {n:3,titre:'Entretien du candidat',desc:'Entretien du candidat avec le comité de centre. (Dossier d\'engagement complété et transmis avant cette étape.)'},
+  {n:4,titre:'Visite médicale',desc:'Visite médicale de recrutement par un médecin de sapeur-pompier habilité.'},
+  {n:5,titre:'Engagement',desc:'Signature de l\'arrêté d\'engagement et de la charte des sapeurs-pompiers volontaires.'},
+  {n:6,titre:'Équipements',desc:'Remise des équipements (tenue, BIP, clés, …).'},
+  {n:7,titre:'Formation',desc:'Début de la formation initiale.'},
+];
+// RECRUES : {id, nom, prenom, tel, email, etape (1..7), dossierOk, dateDebut, notes, historique:[]}
+var RECRUES = [];
+
+function renderRecrues(){
+  const el=document.getElementById('recruesContent');if(!el)return;
+  // Badge : recrues non finalisées (étape < 7)
+  const enCours=RECRUES.filter(r=>r.etape<7).length;
+  const b=document.getElementById('badge-recrues');
+  if(b){b.textContent=RECRUES.length;b.style.display=RECRUES.length?'':'none';}
+  if(!RECRUES.length){el.innerHTML='<div class="rappel-empty">Aucune recrue en cours de recrutement.<br><span style="font-size:12px">Cliquez sur "+ Ajouter une recrue" pour suivre un nouveau candidat sur les 7 étapes du parcours d\'engagement.</span></div>';return;}
+  let html='';
+  RECRUES.slice().sort((a,b)=>a.nom.localeCompare(b.nom)).forEach(r=>{
+    const i=RECRUES.indexOf(r);
+    const pct=Math.round((r.etape-1)/6*100); // étape 1 = 0%, étape 7 = 100%
+    const fini=r.etape>=7;
+    const cur=RECRUE_ETAPES.find(e=>e.n===r.etape)||RECRUE_ETAPES[0];
+    html+='<div style="background:#fff;border:1px solid #e5e5e0;border-radius:10px;padding:16px;margin-bottom:12px">';
+    // En-tête
+    html+='<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">';
+    html+='<div style="width:40px;height:40px;border-radius:50%;background:'+avatarColor(r.nom||'?')+';color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px">'+((r.nom||'?')[0]+((r.prenom||'?')[0])).toUpperCase()+'</div>';
+    html+='<div style="flex:1"><div style="font-weight:700;font-size:15px">'+r.nom+' '+r.prenom+'</div>';
+    html+='<div style="font-size:11px;color:#888">'+(r.tel?'📞 '+r.tel:'')+(r.tel&&r.email?' · ':'')+(r.email?r.email:'')+'</div></div>';
+    html+=fini?'<span class="pill p-ok" style="font-size:12px">✓ Parcours terminé</span>':'<span class="pill p-warn" style="font-size:12px">Étape '+r.etape+'/7</span>';
+    html+='<button class="btn btn-sm" onclick="openRecrue('+i+')" style="margin-left:8px">✏ Gérer</button>';
+    html+='</div>';
+    // Barre de progression à étapes
+    html+='<div style="display:flex;align-items:center;gap:0;margin-bottom:10px">';
+    RECRUE_ETAPES.forEach((e,idx)=>{
+      const done=r.etape>e.n;
+      const current=r.etape===e.n;
+      const bg=done?'#1a7a3a':current?'#cc3300':'#e5e5e0';
+      const fg=done||current?'#fff':'#999';
+      html+='<div style="flex:1;text-align:center">';
+      html+='<div title="'+e.titre+'" style="width:26px;height:26px;border-radius:50%;background:'+bg+';color:'+fg+';display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;margin:0 auto">'+(done?'✓':e.n)+'</div>';
+      html+='</div>';
+      if(idx<RECRUE_ETAPES.length-1)html+='<div style="height:3px;flex:0 0 100%;max-width:100%;background:'+(r.etape>e.n?'#1a7a3a':'#e5e5e0')+';align-self:center;margin-top:-13px"></div>';
+    });
+    html+='</div>';
+    // Étape courante
+    if(!fini)html+='<div style="font-size:12px;background:#fffcfc;border-left:3px solid #cc3300;padding:8px 12px;border-radius:4px"><strong>Étape '+cur.n+' — '+cur.titre+'</strong><br><span style="color:#777">'+cur.desc+'</span></div>';
+    // Dossier
+    html+='<div style="display:flex;gap:16px;margin-top:8px;font-size:11px;color:#888;flex-wrap:wrap">';
+    html+='<span>📁 Dossier d\'engagement : '+(r.dossierOk?'<span class="green">✓ complété et transmis</span>':'<span class="orange">en attente</span>')+'</span>';
+    if(r.dateDebut)html+='<span>📅 Candidature : '+fmt(r.dateDebut)+'</span>';
+    html+='</div>';
+    html+='</div>';
+  });
+  el.innerHTML=html;
+}
+
+function openNewRecrue(){
+  RECRUES.push({id:'r'+Date.now(),nom:'NOUVELLE',prenom:'Recrue',tel:'',email:'',etape:1,dossierOk:false,dateDebut:TODAY.toISOString().split('T')[0],notes:'',historique:[]});
+  openRecrue(RECRUES.length-1);
+}
+
+function openRecrue(i){
+  const r=RECRUES[i];
+  let html='<div class="drawer-hdr"><h2>🆕 '+r.nom+' '+r.prenom+'</h2><button class="x-btn" onclick="closeOverlay();renderRecrues()">×</button></div>';
+  html+='<div class="edit-form">';
+  html+='<div class="form-section"><div class="form-section-title">Identité & contact</div><div class="ig">';
+  html+='<div><label>Nom</label><input id="rnom" value="'+(r.nom||'').replace(/"/g,'&quot;')+'"></div>';
+  html+='<div><label>Prénom</label><input id="rprenom" value="'+(r.prenom||'').replace(/"/g,'&quot;')+'"></div>';
+  html+='<div><label>Téléphone</label><input id="rtel" value="'+(r.tel||'').replace(/"/g,'&quot;')+'"></div>';
+  html+='<div><label>Email</label><input id="remail" value="'+(r.email||'').replace(/"/g,'&quot;')+'"></div>';
+  html+='<div><label>Date de candidature (JJ/MM/AAAA)</label><input id="rdate" value="'+(r.dateDebut?fmt(r.dateDebut):'')+'"></div>';
+  html+='<div></div>';
+  html+='</div></div>';
+  html+='<div class="form-section"><div class="form-section-title">Avancement du parcours</div>';
+  html+='<label style="margin-bottom:6px">Étape actuelle</label>';
+  html+='<select id="retape" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:5px;font-size:13px;margin-bottom:10px">';
+  RECRUE_ETAPES.forEach(e=>{html+='<option value="'+e.n+'"'+(r.etape===e.n?' selected':'')+'>Étape '+e.n+' — '+e.titre+'</option>';});
+  html+='<option value="8"'+(r.etape>=8?' selected':'')+'>✓ Recrue intégrée (clôturer)</option>';
+  html+='</select>';
+  html+='<label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:400;text-transform:none;letter-spacing:0;cursor:pointer"><input type="checkbox" id="rdossier"'+(r.dossierOk?' checked':'')+' style="width:auto">Dossier d\'engagement complété et transmis (requis avant l\'étape 3)</label>';
+  html+='</div>';
+  html+='<div class="form-section"><div class="form-section-title">Notes de suivi</div>';
+  html+='<textarea id="rnotes" rows="3">'+(r.notes||'')+'</textarea></div>';
+  // Historique
+  html+='<div class="sec-lbl">Historique</div>';
+  if(r.historique&&r.historique.length)html+=r.historique.slice().reverse().map(h=>'<div class="hist-item"><div class="hist-date">'+h.date+'</div>'+h.texte+'</div>').join('');
+  else html+='<p style="font-size:12px;color:#aaa;margin-bottom:8px">Aucune entrée.</p>';
+  html+='<div class="btn-row"><button class="btn btn-primary" onclick="saveRecrue('+i+')">💾 Enregistrer</button>';
+  html+='<button class="btn btn-ok" onclick="promoteRecrue('+i+')" title="Transférer vers la liste des agents">➡ Intégrer aux agents</button>';
+  html+='<button class="btn btn-danger" onclick="deleteRecrue('+i+')">🗑 Supprimer</button></div>';
+  html+='</div>';
+  document.getElementById('drawer').innerHTML=html;
+  document.getElementById('overlay').classList.add('open');
+}
+
+function saveRecrue(i){
+  const r=RECRUES[i];
+  const oldEtape=r.etape;
+  r.nom=document.getElementById('rnom').value.trim().toUpperCase();
+  r.prenom=document.getElementById('rprenom').value.trim();
+  r.tel=document.getElementById('rtel').value.trim();
+  r.email=document.getElementById('remail').value.trim();
+  r.dateDebut=parseMyDate(document.getElementById('rdate').value);
+  r.etape=+document.getElementById('retape').value;
+  r.dossierOk=document.getElementById('rdossier').checked;
+  r.notes=document.getElementById('rnotes').value.trim();
+  if(!r.historique)r.historique=[];
+  if(r.etape!==oldEtape){
+    const et=r.etape>=8?'Parcours clôturé / intégrée':('Passage à l\'étape '+r.etape+' — '+(RECRUE_ETAPES.find(e=>e.n===r.etape)||{titre:''}).titre);
+    r.historique.push({date:TODAY.toLocaleDateString('fr-FR'),texte:et});
+  }
+  DIRTY.full=true;
+  addLog('Recrue mise à jour : '+r.nom+' '+r.prenom);
+  cloudSave();closeOverlay();renderRecrues();
+  showToast('Recrue '+r.nom+' enregistrée','success');
+}
+
+function deleteRecrue(i){
+  if(!confirm('Supprimer la recrue '+RECRUES[i].nom+' '+RECRUES[i].prenom+' ?'))return;
+  RECRUES.splice(i,1);DIRTY.full=true;cloudSave();closeOverlay();renderRecrues();
+}
+
+function promoteRecrue(i){
+  const r=RECRUES[i];
+  if(!confirm('Intégrer '+r.nom+' '+r.prenom+' à la liste des agents ?\nLa recrue sera ajoutée comme agent et retirée du suivi des recrues.'))return;
+  DATA.push({nom:r.nom,prenom:r.prenom,grade:'SAP',statut:'SPV',naissance:'',fonctions:'',qualifs:'',sap:null,inc:null,fdf:null,cod:null,med:null,aptitude:'',tel:r.tel||'',email:r.email||'',adresse:'',mat:'',contact:'',ctTel:'',permB:true,permC:false,permCE:false,permD:false,numPermis:'',vmC:null,vmD:null,bip:'',taille:'',entree_cis:TODAY.toISOString().split('T')[0],dispo:'dispo',notes:'Intégré depuis le suivi des recrues',historique:[{date:TODAY.toLocaleDateString('fr-FR'),texte:'Recrue intégrée au centre'}],qualifications:{}});
+  const newAgent=DATA[DATA.length-1];
+  markDirtyAgent(newAgent);
+  RECRUES.splice(i,1);DIRTY.full=true;
+  addLog('Recrue intégrée aux agents : '+r.nom+' '+r.prenom);
+  cloudSave();closeOverlay();
+  view=DATA.slice();populateQualifFilter();applyFilters();updateStats();renderBadges();renderRecrues();
+  showToast(r.nom+' intégré(e) à la liste des agents ✓','success');
+}
+
+function printRecrues(){
+  const w=window.open('','_blank');
+  let body='';
+  RECRUES.slice().sort((a,b)=>a.nom.localeCompare(b.nom)).forEach(r=>{
+    const cur=RECRUE_ETAPES.find(e=>e.n===r.etape)||{n:r.etape,titre:'Intégrée'};
+    body+='<div style="break-inside:avoid;border:1px solid #ddd;border-radius:8px;padding:12px;margin-bottom:10px">'+
+    '<div style="display:flex;justify-content:space-between"><strong style="font-size:14px">'+r.nom+' '+r.prenom+'</strong>'+
+    '<span style="font-size:12px;color:#cc3300;font-weight:700">'+(r.etape>=8?'Intégrée':'Étape '+r.etape+'/7 — '+cur.titre)+'</span></div>'+
+    '<div style="font-size:11px;color:#666;margin-top:4px">'+(r.tel?'📞 '+r.tel+'  ':'')+(r.email||'')+'</div>'+
+    '<div style="font-size:11px;margin-top:4px">Dossier : '+(r.dossierOk?'✓ transmis':'en attente')+(r.dateDebut?'  ·  Candidature : '+fmt(r.dateDebut):'')+'</div>'+
+    (r.notes?'<div style="font-size:11px;color:#666;margin-top:4px">'+r.notes+'</div>':'')+
+    '</div>';
+  });
+  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Suivi des recrues — CIS Ruoms</title></head>'+
+  '<body style="font-family:system-ui,sans-serif;padding:25px;color:#1a1a1a;max-width:800px;margin:0 auto">'+
+  '<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #cc3300;padding-bottom:10px;margin-bottom:16px">'+
+  '<h1 style="margin:0;font-size:18px">🆕 Suivi des nouvelles recrues — CIS Ruoms</h1>'+
+  '<div style="font-size:11px;color:#888;text-align:right">SDIS 07<br>Édité le '+TODAY.toLocaleDateString('fr-FR')+'</div></div>'+
+  (body||'<p style="color:#888">Aucune recrue en cours.</p>')+
+  '<script>window.onload=()=>window.print();<\/script></body></html>');
+  w.document.close();
+}
 
 // ── CATALOGUE DE QUALIFICATIONS ───────────────────────────────
 // Chaque qualification : code, libellé, catégorie, durée de validité en mois (0 = pas d'expiration)
