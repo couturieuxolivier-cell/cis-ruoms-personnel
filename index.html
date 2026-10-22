@@ -324,7 +324,7 @@ body.dark .compliance-bar-bg,body.dark .dash-bar-wrap{background:#3a3a42}
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2c0 6-8 8-8 14a8 8 0 0 0 16 0C20 10 12 8 12 2z"/></svg>
   <h1>CIS Ruoms — Gestion du Personnel</h1>
   <span class="hbadge">SDIS 07</span>
-  <span class="hbadge" style="opacity:.7" title="Version de l'application">v3.2</span>
+  <span class="hbadge" style="opacity:.7" title="Version de l'application">v3.3</span>
   <span class="hbadge notif-btn" id="notifBell" onclick="toggleNotifRequest()" title="Notifications navigateur">
     🔔 <span id="notifCount">0</span>
   </span>
@@ -1377,7 +1377,7 @@ function downloadCSV(filename,cols,rows){
   const BOM='\uFEFF';
   const esc=v=>'"'+(v||'').toString().replace(/"/g,'""')+'"';
   const csv=BOM+[cols,...rows].map(r=>r.map(esc).join(';')).join('\n');
-  triggerDownload(new Blob([csv],{type:'application/octet-stream'}),filename);
+  triggerDownload(new Blob([csv],{type:'text/csv;charset=utf-8'}),filename);
 }
 
 // ── Fiche agent ───────────────────────────────────────────────
@@ -2569,19 +2569,38 @@ function exportICS(){
 
 // ── SAUVEGARDE JSON ───────────────────────────────────────────
 function triggerDownload(blob,filename){
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url;
-  a.download=filename;
-  a.style.display='none';
-  document.body.appendChild(a);
-  // dispatchEvent est plus fiable que .click() sur Safari
-  a.dispatchEvent(new MouseEvent('click',{view:window,bubbles:true,cancelable:true}));
-  setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},60000);
+  // 1. Safari / iOS : utiliser l'API de partage native si dispo (fiable)
+  try{
+    if(navigator.canShare){
+      const file=new File([blob],filename,{type:blob.type});
+      if(navigator.canShare({files:[file]})){
+        navigator.share({files:[file],title:filename}).catch(()=>{});
+        return;
+      }
+    }
+  }catch(e){}
+  // 2. Méthode standard : lien de téléchargement
+  try{
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download=filename;a.rel='noopener';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(()=>{try{document.body.removeChild(a);}catch(e){}URL.revokeObjectURL(url);},4000);
+  }catch(e){
+    // 3. Plan B : ouvrir le contenu dans un nouvel onglet (enregistrer avec Cmd+S)
+    blob.text().then(txt=>{
+      const w=window.open('','_blank');
+      if(w){
+        w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+filename+'</title></head><body style="font-family:monospace;padding:16px;white-space:pre-wrap;word-break:break-all"><p style="font-family:system-ui;background:#fff3cd;padding:10px;border-radius:6px">⚠️ Le téléchargement automatique a échoué. Enregistrez cette page avec <strong>Cmd+S</strong> (nom : <strong>'+filename+'</strong>) ou copiez tout le texte ci-dessous dans un fichier.</p><hr>'+txt.replace(/</g,'&lt;')+'</body></html>');
+        w.document.close();
+      }
+    });
+  }
 }
 function exportBackupJSON(){
   const data=JSON.stringify(serialise(),null,2);
-  triggerDownload(new Blob([data],{type:'application/octet-stream'}),'sauvegarde_cis_ruoms_'+new Date().toISOString().split('T')[0]+'.json');
+  triggerDownload(new Blob([data],{type:'application/json'}),'sauvegarde_cis_ruoms_'+new Date().toISOString().split('T')[0]+'.json');
   showToast('Sauvegarde téléchargée 💾 (vérifiez vos Téléchargements)','success');
 }
 function importBackupJSON(input){
